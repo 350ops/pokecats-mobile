@@ -1,8 +1,9 @@
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
-import { Pressable, PressableProps, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Pressable, PressableProps, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
 interface GlassButtonProps extends PressableProps {
     title?: string;
@@ -11,12 +12,15 @@ interface GlassButtonProps extends PressableProps {
 }
 
 export function GlassButton({ title, icon, variant = 'glass', style, ...props }: GlassButtonProps) {
+    const { isDark } = useTheme();
+
     return (
         <Pressable
             style={({ pressed }) => [
                 styles.container,
                 variant === 'primary' && styles.primary,
                 variant === 'secondary' && styles.secondary,
+                variant === 'glass' && { borderColor: isDark ? Colors.glass.border : 'rgba(0,0,0,0.1)' },
                 pressed && styles.pressed,
                 style as ViewStyle
             ]}
@@ -25,14 +29,14 @@ export function GlassButton({ title, icon, variant = 'glass', style, ...props }:
             {({ pressed }) => (
                 <>
                     {variant === 'glass' && (
-                        <BlurView intensity={pressed ? 80 : 40} tint="dark" style={StyleSheet.absoluteFill} />
+                        <BlurView intensity={pressed ? 80 : 40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                     )}
                     <View style={styles.content}>
                         {icon && (
                             // @ts-ignore: expo-symbols might not have TS types set up perfectly in all environments yet or requires specific icon names
-                            <SymbolView name={icon} tintColor={Colors.glass.text} size={24} style={title ? styles.icon : undefined} />
+                            <SymbolView name={icon} tintColor={isDark ? Colors.glass.text : Colors.light.icon} size={24} style={title ? styles.icon : undefined} />
                         )}
-                        {title && <Text style={styles.text}>{title}</Text>}
+                        {title && <Text style={[styles.text, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{title}</Text>}
                     </View>
                 </>
             )}
@@ -40,7 +44,6 @@ export function GlassButton({ title, icon, variant = 'glass', style, ...props }:
     );
 }
 
-import { View } from 'react-native';
 
 const styles = StyleSheet.create({
     container: {

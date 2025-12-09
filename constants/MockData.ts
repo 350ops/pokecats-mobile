@@ -72,4 +72,52 @@ export const MOCK_CATS: Cat[] = [
         lastSighted: '1w ago',
         tnrStatus: true,
     },
+    {
+        id: '6',
+        name: 'Cleo',
+        image: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=600&q=80',
+        breed: 'Siamese Mix',
+        distance: '1.5 km',
+        status: 'Healthy',
+        description: 'Elegant Siamese with striking blue eyes. Often spotted near the community garden.',
+        lastFed: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
+        lastSighted: '3h ago',
+        tnrStatus: true,
+    },
+    {
+        id: '7',
+        name: 'Patches',
+        image: 'https://images.unsplash.com/photo-1561948955-570b270e7c36?auto=format&fit=crop&w=600&q=80',
+        breed: 'Calico',
+        distance: '0.7 km',
+        status: 'Needs Help',
+        description: 'Beautiful calico with patches of orange and black. Has a slight limp - needs vet care.',
+        lastFed: new Date(Date.now() - 1000 * 60 * 60 * 18), // 18 hours ago
+        lastSighted: '5h ago',
+        tnrStatus: false,
+    },
+    {
+        id: '8',
+        name: 'Oliver',
+        image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=600&q=80',
+        breed: 'British Shorthair',
+        distance: '2.5 km',
+        status: 'Healthy',
+        description: 'Chubby grey cat with round face. Very calm and loves chin scratches.',
+        lastFed: new Date(Date.now() - 1000 * 60 * 45), // 45 mins ago
+        lastSighted: '20m ago',
+        tnrStatus: true,
+    },
+    {
+        id: '9',
+        name: 'Bella',
+        image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&w=600&q=80',
+        breed: 'Persian Mix',
+        distance: '1.0 km',
+        status: 'Healthy',
+        description: 'Fluffy white cat with a flat face. Usually found sunbathing on windowsills.',
+        lastFed: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
+        lastSighted: '4h ago',
+        tnrStatus: true,
+    },
 ];

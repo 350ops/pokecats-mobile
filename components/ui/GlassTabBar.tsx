@@ -1,23 +1,28 @@
-import { View, Platform, StyleSheet, LayoutChangeEvent } from 'react-native';
-import { useLinkBuilder, useTheme } from '@react-navigation/native';
-import { Text, PlatformPressable } from '@react-navigation/elements';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { PlatformPressable, Text } from '@react-navigation/elements';
+import { useLinkBuilder } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
+import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
 
 export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const { buildHref } = useLinkBuilder();
     const [layout, setLayout] = useState({ width: 0, height: 0 });
+    const { isDark } = useTheme();
 
     const onLayout = (e: LayoutChangeEvent) => {
         setLayout(e.nativeEvent.layout);
     }
 
     return (
-        <View style={styles.container} onLayout={onLayout}>
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[styles.container, {
+            borderColor: isDark ? Colors.glass.border : 'rgba(0,0,0,0.1)',
+            backgroundColor: isDark ? 'transparent' : 'rgba(255,255,255,0.8)' // Fallback if blur is issues, but mostly for tint
+        }]} onLayout={onLayout}>
+            <BlurView intensity={80} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
             <View style={styles.content}>
                 {state.routes.map((route, index) => {
                     const { options } = descriptors[route.key];
@@ -76,9 +81,9 @@ export function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProp
                             <SymbolView
                                 name={iconName as any}
                                 size={24}
-                                tintColor={isFocused ? Colors.primary.green : Colors.glass.textSecondary}
+                                tintColor={isFocused ? (isDark ? Colors.primary.green : Colors.primary.blue) : (isDark ? Colors.glass.textSecondary : Colors.light.icon)}
                             />
-                            <Text style={[styles.label, { color: isFocused ? Colors.primary.green : Colors.glass.textSecondary }]}>
+                            <Text style={[styles.label, { color: isFocused ? (isDark ? Colors.primary.green : Colors.primary.blue) : (isDark ? Colors.glass.textSecondary : Colors.light.icon) }]}>
                                 {typeof label === 'string' ? label : route.name}
                             </Text>
                         </PlatformPressable>

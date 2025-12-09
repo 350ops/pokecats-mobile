@@ -1,6 +1,7 @@
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
@@ -21,6 +22,7 @@ const INITIAL_REGION = {
 export default function MapScreen() {
     const [selectedCat, setSelectedCat] = useState<any>(null); // DB object has slightly different shape?
     const [cats, setCats] = useState<any[]>([]);
+    const { isDark, colorScheme } = useTheme();
 
     useFocusEffect(
         useCallback(() => {
@@ -62,7 +64,7 @@ export default function MapScreen() {
             <MapView
                 style={StyleSheet.absoluteFill}
                 initialRegion={INITIAL_REGION}
-                userInterfaceStyle="dark"
+                userInterfaceStyle={colorScheme ?? 'light'}
                 tintColor={Colors.primary.green}
                 onPress={() => setSelectedCat(null)}
             >
@@ -87,7 +89,7 @@ export default function MapScreen() {
 
             {!selectedCat && (
                 <GlassView style={styles.overlay} intensity={60}>
-                    <Text style={styles.overlayText}>{cats.length} Cats Nearby</Text>
+                    <Text style={[styles.overlayText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{cats.length} Cats Nearby</Text>
                 </GlassView>
             )}
 
@@ -95,8 +97,8 @@ export default function MapScreen() {
                 <GlassView style={styles.detailOverlay} intensity={80}>
                     <View style={styles.detailHeader}>
                         <View>
-                            <Text style={styles.catName}>{selectedCat.name}</Text>
-                            <Text style={styles.catBreed}>{selectedCat.breed}</Text>
+                            <Text style={[styles.catName, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{selectedCat.name}</Text>
+                            <Text style={[styles.catBreed, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{selectedCat.breed}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                             <Link href={{ pathname: '/update', params: { id: selectedCat.id } }} asChild>
@@ -117,16 +119,16 @@ export default function MapScreen() {
                                     Last Fed
                                 </Text>
                             </View>
-                            <Text style={styles.infoValue}>{getTimeAgo(selectedCat.lastFed)}</Text>
+                            <Text style={[styles.infoValue, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{getTimeAgo(selectedCat.lastFed)}</Text>
                         </View>
 
                         {/* Last Sighted */}
                         <View style={styles.infoItem}>
                             <View style={styles.iconRow}>
-                                <SymbolView name="eye.fill" tintColor={Colors.glass.text} size={20} />
-                                <Text style={styles.infoLabel}>Seen</Text>
+                                <SymbolView name="eye.fill" tintColor={isDark ? Colors.glass.text : Colors.light.icon} size={20} />
+                                <Text style={[styles.infoLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Seen</Text>
                             </View>
-                            <Text style={styles.infoValue}>{getTimeAgo(selectedCat.lastSighted)}</Text>
+                            <Text style={[styles.infoValue, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{getTimeAgo(selectedCat.lastSighted)}</Text>
                         </View>
 
                         {/* TNR Status */}
@@ -142,7 +144,7 @@ export default function MapScreen() {
                                     TNR
                                 </Text>
                             </View>
-                            <Text style={styles.infoValue}>{selectedCat.tnrStatus ? "Sterilized" : "Intact"}</Text>
+                            <Text style={[styles.infoValue, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{selectedCat.tnrStatus ? "Sterilized" : "Intact"}</Text>
                         </View>
                     </View>
                 </GlassView>

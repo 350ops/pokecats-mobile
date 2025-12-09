@@ -126,11 +126,17 @@ export const seedDatabase = async () => {
     const { error: deleteError } = await supabase.from('cats').delete().neq('id', 0);
     if (deleteError) console.error('Error clearing cats:', deleteError);
 
-    // 2. User specified locations (Doha)
+    // 2. All mock cats with specific locations (Doha area)
     const specificCats = [
-        { ...MOCK_CATS[0], lat: 25.37131849132432, lon: 51.558225818651536 },
-        { ...MOCK_CATS[1], lat: 25.360560342816825, lon: 51.5663946035289 },
-        { ...MOCK_CATS[2], lat: 25.358961658893847, lon: 51.568901539486866 }
+        { ...MOCK_CATS[0], lat: 25.37131849132432, lon: 51.558225818651536 },   // Whiskers
+        { ...MOCK_CATS[1], lat: 25.360560342816825, lon: 51.5663946035289 },    // Luna
+        { ...MOCK_CATS[2], lat: 25.358961658893847, lon: 51.568901539486866 },  // Ginger
+        { ...MOCK_CATS[3], lat: 25.3750, lon: 51.5450 },                         // Mittens
+        { ...MOCK_CATS[4], lat: 25.3680, lon: 51.5520 },                         // Shadow
+        { ...MOCK_CATS[5], lat: 25.3620, lon: 51.5580 },                         // Cleo
+        { ...MOCK_CATS[6], lat: 25.3700, lon: 51.5600 },                         // Patches
+        { ...MOCK_CATS[7], lat: 25.3640, lon: 51.5500 },                         // Oliver
+        { ...MOCK_CATS[8], lat: 25.3660, lon: 51.5540 },                         // Bella
     ];
 
     for (const cat of specificCats) {

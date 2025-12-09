@@ -1,5 +1,6 @@
 import { Colors } from '@/constants/Colors';
-import { DarkTheme, Theme, ThemeProvider } from '@react-navigation/native';
+import { AppThemeProvider, useTheme } from '@/context/ThemeContext';
+import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
@@ -19,15 +20,28 @@ const CustomDarkTheme: Theme = {
   },
 };
 
+const CustomLightTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: Colors.light.background,
+    text: Colors.light.text,
+    card: Colors.light.background,
+    border: Colors.glass.border,
+    primary: Colors.primary.blue,
+  },
+};
+
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { useRouter, useSegments } from 'expo-router';
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
   const segments = useSegments();
   const router = useRouter();
+  const { isDark, colorScheme } = useTheme();
 
   useEffect(() => {
     // 1. Initialize DB structure (Schema is server-side, this is just a log)
@@ -76,7 +90,7 @@ export default function RootLayout() {
   }, [session, initialized, segments]);
 
   return (
-    <ThemeProvider value={CustomDarkTheme}>
+    <ThemeProvider value={isDark ? CustomDarkTheme : CustomLightTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false, headerTitle: 'Map', headerBackTitle: 'Back' }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -85,7 +99,16 @@ export default function RootLayout() {
         <Stack.Screen name="cat/[id]/translate" options={{ title: 'Translator', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="update" options={{ title: 'Update Cat', headerBackTitle: 'Back', headerShown: true }} />
       </Stack>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
   );
 }
+
+export default function RootLayout() {
+  return (
+    <AppThemeProvider>
+      <RootLayoutContent />
+    </AppThemeProvider>
+  );
+}
+
