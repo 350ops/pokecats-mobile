@@ -1,24 +1,30 @@
-import { StyleSheet, Text, View, Image } from 'react-native';
-import { GlassView } from './ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { Cat } from '@/constants/MockData';
+import { useTheme } from '@/context/ThemeContext';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { GlassView } from './ui/GlassView';
 
 interface CatCardProps {
     cat: Cat;
 }
 
 export function CatCard({ cat }: CatCardProps) {
+    const { isDark } = useTheme();
+
     return (
-        <GlassView style={styles.card} intensity={40}>
+        <GlassView
+            style={[styles.card, { backgroundColor: isDark ? Colors.glass.background : '#FFFFFF', borderColor: isDark ? Colors.glass.border : 'rgba(0,0,0,0.1)' }]}
+            intensity={isDark ? 50 : 0} // Disable blur brightness in light mode if we want pure white
+        >
             <Image source={{ uri: cat.image }} style={styles.image} />
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.name}>{cat.name}</Text>
+                    <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{cat.name}</Text>
                     <View style={[styles.badge, cat.status === 'Needs Help' ? styles.badgeAlert : styles.badgeOk]}>
-                        <Text style={styles.badgeText}>{cat.status}</Text>
+                        <Text style={[styles.badgeText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{cat.status}</Text>
                     </View>
                 </View>
-                <Text style={styles.breed}>{cat.breed}</Text>
+                <Text style={[styles.breed, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{cat.breed}</Text>
                 <View style={styles.footer}>
                     <Text style={styles.distance}>{cat.distance}</Text>
                 </View>
@@ -31,6 +37,8 @@ const styles = StyleSheet.create({
     card: {
         marginBottom: 20,
         borderRadius: 24,
+        flex: 1, // Enable flex for grid layout
+        overflow: 'hidden', // Ensure image doesn't bleed
     },
     image: {
         width: '100%',

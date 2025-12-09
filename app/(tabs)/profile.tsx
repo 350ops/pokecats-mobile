@@ -1,6 +1,7 @@
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
@@ -9,6 +10,7 @@ import { useEffect, useState } from 'react';
 
 export default function ProfileScreen() {
     const [session, setSession] = useState<Session | null>(null);
+    const { isDark } = useTheme();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -33,44 +35,56 @@ export default function ProfileScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
                     <Image source={{ uri: user.avatar }} style={styles.avatar} />
-                    <Text style={styles.name}>{user.name}</Text>
+                    <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.name}</Text>
                     <Text style={styles.role}>{user.role}</Text>
-                    <Text style={{ color: Colors.glass.textSecondary, marginTop: 5 }}>{session?.user?.email}</Text>
+                    <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 5 }}>{session?.user?.email}</Text>
                 </View>
 
                 <View style={styles.statsRow}>
-                    <GlassView style={styles.statCard} intensity={20}>
-                        <Text style={styles.statNumber}>{user.stats.sightings}</Text>
-                        <Text style={styles.statLabel}>Sightings</Text>
+                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
+                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
+                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.sightings}</Text>
+                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Sightings</Text>
+                        </View>
                     </GlassView>
-                    <GlassView style={styles.statCard} intensity={20}>
-                        <Text style={styles.statNumber}>{user.stats.fed}</Text>
-                        <Text style={styles.statLabel}>Times Fed</Text>
+                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
+                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
+                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.fed}</Text>
+                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Times Fed</Text>
+                        </View>
                     </GlassView>
-                    <GlassView style={styles.statCard} intensity={20}>
-                        <Text style={styles.statNumber}>{user.stats.adopted}</Text>
-                        <Text style={styles.statLabel}>Managed</Text>
+                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
+                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
+                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.adopted}</Text>
+                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Managed</Text>
+                        </View>
                     </GlassView>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Preferences</Text>
+                    <Text style={[styles.sectionTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Preferences</Text>
 
-                    <GlassView style={styles.menuItem} intensity={30}>
-                        <Text style={styles.menuText}>Notifications</Text>
-                        <GlassButton icon="bell" style={styles.iconBtn} />
+                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
+                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Notifications</Text>
+                            <GlassButton icon="bell" style={styles.iconBtn} />
+                        </View>
                     </GlassView>
-                    <GlassView style={styles.menuItem} intensity={30}>
-                        <Text style={styles.menuText}>Location Settings</Text>
-                        <GlassButton icon="location" style={styles.iconBtn} />
+                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
+                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Location Settings</Text>
+                            <GlassButton icon="location" style={styles.iconBtn} />
+                        </View>
                     </GlassView>
-                    <GlassView style={styles.menuItem} intensity={30}>
-                        <Text style={styles.menuText}>Dark Mode</Text>
-                        <GlassButton icon="moon.fill" style={styles.iconBtn} />
+                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
+                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Dark Mode</Text>
+                            <GlassButton icon="moon.fill" style={styles.iconBtn} />
+                        </View>
                     </GlassView>
                 </View>
 
@@ -112,7 +126,7 @@ const styles = StyleSheet.create({
     name: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: Colors.glass.text,
+        // color: Colors.glass.text,
         marginBottom: 4,
     },
     role: {
@@ -129,19 +143,19 @@ const styles = StyleSheet.create({
     },
     statCard: {
         flex: 1,
-        padding: 16,
+        // padding: 16, // Moved to inner view
         alignItems: 'center',
         borderRadius: 20,
     },
     statNumber: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: Colors.glass.text,
+        // color: Colors.glass.text,
         marginBottom: 4,
     },
     statLabel: {
         fontSize: 12,
-        color: Colors.glass.textSecondary,
+        // color: Colors.glass.textSecondary,
         textAlign: 'center',
     },
     section: {
@@ -151,21 +165,21 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: Colors.glass.text,
+        // color: Colors.glass.text,
         marginBottom: 16,
         marginLeft: 4,
     },
     menuItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 16,
+        // flexDirection: 'row', // Moved to inner view
+        // justifyContent: 'space-between',
+        // alignItems: 'center',
+        // padding: 16,
         borderRadius: 16,
         marginBottom: 12,
     },
     menuText: {
         fontSize: 16,
-        color: Colors.glass.text,
+        // color: Colors.glass.text,
     },
     iconBtn: {
         height: 40,

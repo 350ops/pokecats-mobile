@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View, FlatList, Image } from 'react-native';
+import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GlassButton } from '@/components/ui/GlassButton';
 
 const POSTS = [
     {
@@ -38,38 +39,41 @@ const POSTS = [
 
 export default function CommunityScreen() {
     const insets = useSafeAreaInsets();
+    const { isDark } = useTheme();
 
     const renderItem = ({ item }: { item: typeof POSTS[0] }) => (
-        <GlassView style={styles.postCard} intensity={30}>
-            <View style={styles.header}>
-                <Image source={{ uri: item.avatar }} style={styles.avatar} />
-                <View style={styles.headerText}>
-                    <Text style={styles.username}>{item.user}</Text>
-                    <Text style={styles.time}>{item.time}</Text>
+        <GlassView style={styles.postCard} intensity={isDark ? 30 : 0}>
+            <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', borderRadius: 24, padding: 16 }}>
+                <View style={styles.header}>
+                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                    <View style={styles.headerText}>
+                        <Text style={[styles.username, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{item.user}</Text>
+                        <Text style={[styles.time, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.time}</Text>
+                    </View>
                 </View>
-            </View>
 
-            <Text style={styles.content}>{item.content}</Text>
+                <Text style={[styles.content, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{item.content}</Text>
 
-            {item.image && (
-                <Image source={{ uri: item.image }} style={styles.postImage} />
-            )}
+                {item.image && (
+                    <Image source={{ uri: item.image }} style={styles.postImage} />
+                )}
 
-            <View style={styles.footer}>
-                <View style={styles.action}>
-                    <GlassButton icon="heart" style={styles.actionBtn} />
-                    <Text style={styles.actionText}>{item.likes}</Text>
-                </View>
-                <View style={styles.action}>
-                    <GlassButton icon="bubble.left" style={styles.actionBtn} />
-                    <Text style={styles.actionText}>{item.comments}</Text>
+                <View style={styles.footer}>
+                    <View style={styles.action}>
+                        <GlassButton icon="heart" style={styles.actionBtn} />
+                        <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.likes}</Text>
+                    </View>
+                    <View style={styles.action}>
+                        <GlassButton icon="bubble.left" style={styles.actionBtn} />
+                        <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.comments}</Text>
+                    </View>
                 </View>
             </View>
         </GlassView>
     );
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <FlatList
                 data={POSTS}
                 renderItem={renderItem}
@@ -93,8 +97,8 @@ const styles = StyleSheet.create({
     },
     postCard: {
         marginBottom: 20,
-        padding: 16,
         borderRadius: 24,
+        overflow: 'hidden',
     },
     header: {
         flexDirection: 'row',
@@ -111,19 +115,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     username: {
-        color: Colors.glass.text,
-        fontWeight: 'bold',
         fontSize: 16,
+        fontWeight: 'bold',
+        // color handled in component
     },
     time: {
-        color: Colors.glass.textSecondary,
         fontSize: 12,
+        // color handled in component
     },
     content: {
-        color: Colors.glass.text,
         fontSize: 15,
         lineHeight: 22,
         marginBottom: 12,
+        // color handled in component
     },
     postImage: {
         width: '100%',
@@ -145,8 +149,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
     },
     actionText: {
-        color: Colors.glass.textSecondary,
         fontSize: 14,
+        // color handled in component
     }
 
 });
