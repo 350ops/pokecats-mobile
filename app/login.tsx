@@ -6,7 +6,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Image as RNImage, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
@@ -76,7 +76,7 @@ export default function LoginScreen() {
     return (
         <View style={styles.container}>
             <StatusBar style="light" />
-            <Text style={styles.appTitle}>PokeCats</Text>
+            <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
             <GlassView style={styles.card} intensity={90}>
                 <View style={styles.cardContent}>
                     <View style={styles.iconContainer}>
@@ -155,18 +155,14 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.primary.dark,
         justifyContent: 'center',
+        alignItems: 'center', // Center content
         padding: 20,
         gap: 20,
     },
-    appTitle: {
-        fontSize: 40,
-        fontWeight: '900',
-        color: Colors.primary.green,
-        textAlign: 'center',
+    logo: {
+        width: 250,
+        height: 100, // Approximate height
         marginBottom: 10,
-        textShadowColor: 'rgba(57, 255, 20, 0.5)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 20,
     },
     card: {
         borderRadius: 30,
