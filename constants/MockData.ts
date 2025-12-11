@@ -7,8 +7,15 @@ export interface Cat {
     status: 'Healthy' | 'Needs Help' | 'Adopted';
     description: string;
     lastFed?: Date; // Mock: using Date for logic
-    lastSighted: string; // Display string for simplicity in mock
+    lastSighted: string | Date; // Display string for simplicity in mock
     tnrStatus: boolean; // True if ear-tipped/neutered
+    timesFed?: number;
+    distanceMeters?: number;
+    isColonyCat?: boolean;
+    adoptionStatus?: 'looking_for_home' | 'adopted' | 'foster';
+    rescueFlags?: string[];
+    colorProfile?: string[];
+    locationDescription?: string;
 }
 
 export const MOCK_CATS: Cat[] = [
@@ -23,6 +30,11 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
         lastSighted: '10m ago',
         tnrStatus: true,
+        timesFed: 18,
+        isColonyCat: true,
+        rescueFlags: ['friendly'],
+        colorProfile: ['tabby', 'orange'],
+        locationDescription: 'Park bench near the fountain',
     },
     {
         id: '2',
@@ -35,6 +47,11 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 14), // 14 hours ago
         lastSighted: '1h ago',
         tnrStatus: false,
+        timesFed: 2,
+        adoptionStatus: 'looking_for_home',
+        rescueFlags: ['very-thin'],
+        colorProfile: ['black'],
+        locationDescription: 'Behind the grocery loading dock',
     },
     {
         id: '3',
@@ -47,6 +64,8 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
         lastSighted: 'Now',
         tnrStatus: true,
+        timesFed: 9,
+        colorProfile: ['orange', 'white'],
     },
     {
         id: '4',
@@ -59,6 +78,10 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
         lastSighted: '2d ago',
         tnrStatus: true,
+        timesFed: 5,
+        isColonyCat: true,
+        rescueFlags: ['colony'],
+        colorProfile: ['tuxedo'],
     },
     {
         id: '5',
@@ -71,6 +94,9 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 5),
         lastSighted: '1w ago',
         tnrStatus: true,
+        adoptionStatus: 'foster',
+        rescueFlags: ['friendly'],
+        colorProfile: ['grey'],
     },
     {
         id: '6',
@@ -83,6 +109,8 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
         lastSighted: '3h ago',
         tnrStatus: true,
+        timesFed: 7,
+        colorProfile: ['cream', 'tabby'],
     },
     {
         id: '7',
@@ -95,6 +123,9 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 18), // 18 hours ago
         lastSighted: '5h ago',
         tnrStatus: false,
+        adoptionStatus: 'looking_for_home',
+        rescueFlags: ['injured'],
+        colorProfile: ['calico'],
     },
     {
         id: '8',
@@ -107,6 +138,10 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 45), // 45 mins ago
         lastSighted: '20m ago',
         tnrStatus: true,
+        timesFed: 11,
+        isColonyCat: true,
+        rescueFlags: ['friendly'],
+        colorProfile: ['grey'],
     },
     {
         id: '9',
@@ -119,5 +154,8 @@ export const MOCK_CATS: Cat[] = [
         lastFed: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
         lastSighted: '4h ago',
         tnrStatus: true,
+        adoptionStatus: 'looking_for_home',
+        rescueFlags: ['kitten'],
+        colorProfile: ['white'],
     },
 ];

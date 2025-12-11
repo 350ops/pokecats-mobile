@@ -14,6 +14,10 @@ create table public.cats (
   longitude float8 not null,
   last_fed timestamptz,
   last_sighted timestamptz default now(),
+  tnr_status boolean default false,
+  rescue_flags text[] default '{}',
+  color_profile text[],
+  location_description text,
   created_at timestamptz default now()
 );
 
