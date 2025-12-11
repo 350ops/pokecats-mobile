@@ -88,28 +88,37 @@ export default function DiscoverScreen() {
     useFocusEffect(
         useCallback(() => {
             let isActive = true;
+
             const fetchCats = async () => {
                 setLoading(true);
                 try {
                     const data = await getCats();
-                    if (!isActive) return;
+                    if (!isActive) {
+                        return;
+                    }
                     if (data && data.length) {
-                        setCats(data.map(normalizeCat));
+                        setCats(data.map((cat) => normalizeCat(cat)));
                     } else {
                         setCats(createFallbackCats());
                     }
                 } catch (error) {
                     console.error('Failed to load cats', error);
-                    if (isActive) setCats(createFallbackCats());
+                    if (isActive) {
+                        setCats(createFallbackCats());
+                    }
                 } finally {
-                    if (isActive) setLoading(false);
+                    if (isActive) {
+                        setLoading(false);
+                    }
                 }
             };
+
             fetchCats();
+
             return () => {
                 isActive = false;
             };
-        }, [])
+        }, [getCats, createFallbackCats, normalizeCat])
     );
 
     React.useEffect(() => {

@@ -421,7 +421,7 @@ export default function MapScreen() {
                             />
                             <MapActionButton
                                 icon="cross.case.fill"
-                                label={(item.status ?? '').toLowerCase() === 'needs help' ? 'Mark Stable' : 'Help'}
+                                label={(item.status ?? '').toLowerCase() === 'needs help' ? 'Mark OK' : 'Help'}
                                 onPress={() => promptNeedsHelp(item)}
                                 disabled={statusUpdatingCatId === item.id}
                                 textColor={primaryTextColor}
