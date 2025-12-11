@@ -6,7 +6,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Image as RNImage, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Image as RNImage, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView } from 'react-native';
 
 export default function LoginScreen() {
     const [loading, setLoading] = useState(false);
@@ -74,10 +74,14 @@ export default function LoginScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.safeArea}>
             <StatusBar style="light" />
-            <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-            <GlassView style={styles.card} intensity={90}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+                    <View style={styles.logoWrap}>
+                        <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
+                    </View>
+                    <GlassView style={styles.card} intensity={90}>
                 <View style={styles.cardContent}>
                     <View style={styles.iconContainer}>
                         <SymbolView name="pawprint.fill" size={50} tintColor={Colors.primary.green} />
@@ -125,7 +129,7 @@ export default function LoginScreen() {
                         )}
 
                         {Platform.OS === 'ios' && (
-                            <View style={{ marginTop: 15, width: '100%' }}>
+                            <View style={styles.appleWrapper}>
                                 <AppleAuthentication.AppleAuthenticationButton
                                     buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                                     buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
@@ -145,37 +149,45 @@ export default function LoginScreen() {
                         <Text style={styles.switchTextBold}>{isSignUp ? 'Log In' : 'Sign Up'}</Text>
                     </Text>
                 </View>
-            </GlassView>
-        </View>
+                </GlassView>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    safeArea: {
         flex: 1,
         backgroundColor: Colors.primary.dark,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        padding: 24,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center', // Center content
-        padding: 20,
-        gap: 20,
+        gap: 24,
+    },
+    logoWrap: {
+        width: '100%',
+        alignItems: 'center',
     },
     logo: {
-        width: 250,
-        height: 100, // Approximate height
-        marginBottom: 10,
+        width: 220,
+        height: 80,
     },
     card: {
         borderRadius: 30,
         backgroundColor: 'rgba(30, 30, 30, 0.6)',
         borderWidth: 1,
         borderColor: Colors.glass.border,
-        overflow: 'hidden', // Ensure padding doesn't break radius visual
+        width: '100%',
+        maxWidth: 420,
     },
     cardContent: {
-        padding: 30,
+        padding: 28,
         alignItems: 'center',
         gap: 15,
-        width: '100%',
     },
     iconContainer: {
         marginBottom: 5,
@@ -236,6 +248,10 @@ const styles = StyleSheet.create({
     switchTextBold: {
         color: Colors.primary.green,
         fontWeight: 'bold',
+    },
+    appleWrapper: {
+        marginTop: 15,
+        width: '100%',
     },
     appleButton: {
         width: '100%',
