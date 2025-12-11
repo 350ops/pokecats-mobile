@@ -2,7 +2,7 @@
   "expo": {
     "name": "PokeCats",
     "slug": "pokecats",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tempapp",
@@ -12,10 +12,11 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.mmdev.pokecats",
-      "buildNumber": "1.0.1",
+      "buildNumber": "1.0.2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "ANAZ4TXPX5"
     },
     "android": {
       "versionCode": 2,
