@@ -80,74 +80,74 @@ export default function LoginScreen() {
             <StatusBar style={isDark ? 'light' : 'dark'} />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-                   
+
                     <GlassView style={[styles.card, { backgroundColor: isDark ? 'rgba(30, 30, 30, 0.6)' : 'rgba(0, 115, 255, 0.74)' }]} intensity={90}>
-                <View style={styles.cardContent}>
-                    
-                <View style={styles.logoWrap}>
-                        <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
-                    </View>
-             
-                    <View style={styles.inputContainer}>
-                        <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
-                            <SymbolView name="envelope.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
-                            <TextInput
-                                style={[styles.input, { color: 'white' }]}
-                                placeholder="Email"
-                                placeholderTextColor={Colors.glass.textSecondary}
-                                value={email}
-                                onChangeText={setEmail}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                            />
-                        </View>
-                        <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
-                            <SymbolView name="lock.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
-                            <TextInput
-                                style={[styles.input, { color: 'white' }]}
-                                placeholder="Password"
-                                placeholderTextColor={Colors.glass.textSecondary}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
-                    </View>
+                        <View style={styles.cardContent}>
 
-                    <View style={styles.buttonContainer}>
-                        {loading ? (
-                            <ActivityIndicator color={Colors.primary.green} />
-                        ) : (
-                            <GlassButton
-                                title={isSignUp ? 'Sign Up' : 'Log In'}
-                                onPress={handleAuth}
-                                variant="secondary" // Use Green Primary Color
-                                style={styles.authButton}
-                            />
-                        )}
-
-                        {Platform.OS === 'ios' && (
-                            <View style={styles.appleWrapper}>
-                                <AppleAuthentication.AppleAuthenticationButton
-                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                                    cornerRadius={16}
-                                    style={styles.appleButton}
-                                    onPress={handleAppleLogin}
-                                />
+                            <View style={styles.logoWrap}>
+                                <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
                             </View>
-                        )}
-                    </View>
 
-                    <Text
-                        style={[styles.switchText, { color: Colors.glass.textSecondary }]}
-                        onPress={() => setIsSignUp(!isSignUp)}
-                    >
-                        {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-                        <Text style={styles.switchTextBold}>{isSignUp ? 'Log In' : 'Sign Up'}</Text>
-                    </Text>
-                </View>
-                </GlassView>
+                            <View style={styles.inputContainer}>
+                                <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
+                                    <SymbolView name="envelope.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { color: 'white' }]}
+                                        placeholder="Email"
+                                        placeholderTextColor={Colors.glass.textSecondary}
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        autoCapitalize="none"
+                                        keyboardType="email-address"
+                                    />
+                                </View>
+                                <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
+                                    <SymbolView name="lock.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.input, { color: 'white' }]}
+                                        placeholder="Password"
+                                        placeholderTextColor={Colors.glass.textSecondary}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.buttonContainer}>
+                                {loading ? (
+                                    <ActivityIndicator color={Colors.primary.green} />
+                                ) : (
+                                    <GlassButton
+                                        title={isSignUp ? 'Sign Up' : 'Log In'}
+                                        onPress={handleAuth}
+                                        variant="secondary" // Use Green Primary Color
+                                        style={styles.authButton}
+                                    />
+                                )}
+
+                                {Platform.OS === 'ios' && (
+                                    <View style={styles.appleWrapper}>
+                                        <AppleAuthentication.AppleAuthenticationButton
+                                            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                                            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                                            cornerRadius={16}
+                                            style={styles.appleButton}
+                                            onPress={handleAppleLogin}
+                                        />
+                                    </View>
+                                )}
+                            </View>
+
+                            <Text
+                                style={[styles.switchText, { color: Colors.glass.textSecondary }]}
+                                onPress={() => setIsSignUp(!isSignUp)}
+                            >
+                                {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                                <Text style={styles.switchTextBold}>{isSignUp ? 'Log In' : 'Sign Up'}</Text>
+                            </Text>
+                        </View>
+                    </GlassView>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -248,3 +248,5 @@ const styles = StyleSheet.create({
         height: 50,
     },
 });
+
+

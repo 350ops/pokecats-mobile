@@ -17,18 +17,19 @@ type MapCat = {
     image?: string;
     breed?: string;
     status?: string;
-    latitude: number;
-    longitude: number;
+    locationDescription?: string | null;
     lastFed?: string | Date | null;
-    lastSighted?: string | Date | null;
-    tnrStatus?: boolean;
+    distance?: string;
+    latitude?: number;
+    longitude?: number;
     timesFed?: number;
+    lastSighted?: string | Date | null;
     assignedCaregiverId?: number | null;
     assigned_caregiver_id?: number | null;
     caregiverId?: number | null;
     rescueFlags?: string[];
     colorProfile?: string[];
-    locationDescription?: string | null;
+    tnrStatus?: boolean;
 };
 
 type FilterDefinition = {
@@ -103,16 +104,20 @@ export default function MapScreen() {
     useFocusEffect(
         useCallback(() => {
             let isMounted = true;
-            const fetchCats = async () => {
-                const data = await getCats();
-                if (!isMounted) return;
-                setCats(data as MapCat[]);
-                setSelectedCatId((prev) => {
-                    if (prev !== null && prev !== undefined) return prev;
-                    return data.length ? Number(data[0].id) : null;
-                });
+
+            const loadCats = async () => {
+                try {
+                    const data = await getCats();
+                    if (isMounted) {
+                        setCats(data as MapCat[]);
+                    }
+                } catch (e) {
+                    console.error("Failed to load cats", e);
+                }
             };
-            fetchCats();
+
+            loadCats();
+
             return () => {
                 isMounted = false;
             };
@@ -132,15 +137,7 @@ export default function MapScreen() {
         });
     }, [cats, activeFilters]);
 
-    const getJitter = (id: number | string) => {
-        const numId = Number(id);
-        if (!jitterCacheRef.current.has(numId)) {
-            const latOff = (Math.sin(numId) * 0.00015);
-            const lonOff = (Math.cos(numId) * 0.00015);
-            jitterCacheRef.current.set(numId, { latitude: latOff, longitude: lonOff });
-        }
-        return jitterCacheRef.current.get(numId)!;
-    };
+
 
     useEffect(() => {
         if (!filteredCats.length) {
@@ -169,12 +166,15 @@ export default function MapScreen() {
 
     const getDisplayCoordinate = useCallback(
         (cat: MapCat) => {
+            const lat = cat.latitude ?? 0;
+            const lon = cat.longitude ?? 0;
+
             if (isCatAssignedToUser(cat, CURRENT_USER_ID)) {
                 jitterCacheRef.current.delete(cat.id);
-                return { coordinate: { latitude: cat.latitude, longitude: cat.longitude }, precise: true };
+                return { coordinate: { latitude: lat, longitude: lon }, precise: true };
             }
             if (!jitterCacheRef.current.has(cat.id)) {
-                jitterCacheRef.current.set(cat.id, jitterCoordinate(cat.latitude, cat.longitude));
+                jitterCacheRef.current.set(cat.id, jitterCoordinate(lat, lon));
             }
             const coordinate = jitterCacheRef.current.get(cat.id)!;
             return { coordinate, precise: false };
@@ -467,24 +467,17 @@ export default function MapScreen() {
                 {filteredCats.map((cat) => {
                     const { coordinate } = getDisplayCoordinate(cat);
                     const isSelected = selectedCatId === cat.id;
-                    const jitter = getJitter(cat.id);
-                    // Cast cat to any or update logic type, since logic expects string ID from Mock but DB uses number.
-                    // Actually, logic.ts expects Partial<Cat> where id is string.
-                    // We can cast or update logic. Let's fix logic type in a separate step or cast here.
+                    // Cast to any to satisfy type overlap if needed, though StatusCat is compatible.
                     const statusState = getCatStatusState(cat as any);
 
                     return (
                         <Marker
-                            key={cat.id}
-                            coordinate={{
-                                latitude: coordinate.latitude + jitter.latitude,
-                                longitude: coordinate.longitude + jitter.longitude,
-                            }}
+                            key={String(cat.id)}
+                            coordinate={coordinate}
                             onPress={(event) => {
                                 event.stopPropagation();
                                 handleMarkerPress(cat);
                             }}
-                            tracksViewChanges={false}
                             testID={`marker-${cat.id}`}
                         >
                             {/* Simplified Marker View for performance, prioritizing the Ring color */}
@@ -552,6 +545,11 @@ export default function MapScreen() {
                         useNativeDriver: true,
                     })}
                     scrollEventThrottle={16}
+                    getItemLayout={(data, index) => ({
+                        length: CARD_WIDTH + CARD_SPACING,
+                        offset: (CARD_WIDTH + CARD_SPACING) * index,
+                        index,
+                    })}
                 />
             )}
         </View>

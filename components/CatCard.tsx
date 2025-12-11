@@ -1,17 +1,30 @@
 import { Colors } from '@/constants/Colors';
-import { Cat } from '@/constants/MockData';
 import { useTheme } from '@/context/ThemeContext';
 import { getCatStatusState } from '@/lib/cat_logic';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { GlassView } from './ui/GlassView';
 
+// Compatible definition with DB and Map
+interface Cat {
+    id: number | string;
+    name: string;
+    image?: string;
+    breed?: string;
+    status?: string;
+    distance?: string;
+    lastSighted?: string | Date | null;
+    timesFed?: number;
+    rescueFlags?: string[];
+    colorProfile?: string[];
+    isColonyCat?: boolean;
+    adoptionStatus?: string;
+    tnrStatus?: boolean;
+    lastFed?: string | Date | null;
+}
+
 interface CatCardProps {
     cat: Cat & {
         distanceMeters?: number;
-        lastSighted?: string | Date | null;
-        timesFed?: number;
-        rescueFlags?: string[];
-        colorProfile?: string[];
     };
 }
 
