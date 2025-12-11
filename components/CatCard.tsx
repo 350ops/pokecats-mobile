@@ -1,6 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { Cat } from '@/constants/MockData';
 import { useTheme } from '@/context/ThemeContext';
+import { getCatStatusState } from '@/lib/cat_logic';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { GlassView } from './ui/GlassView';
 
@@ -123,6 +124,15 @@ const getDistanceMeta = (cat: Cat & { distanceMeters?: number }): DistanceMeta =
 const getBadgeMeta = (cat: Cat): BadgeMeta[] => {
     const badges: BadgeMeta[] = [];
 
+    // Add Primary Status Badge (Healthy/Hungry/Needs Help)
+    const statusState = getCatStatusState(cat);
+    badges.push({
+        id: 'status',
+        label: statusState.statusText,
+        background: statusState.statusColor,
+        text: statusState.labelColor
+    });
+
     if (cat.rescueFlags?.length) {
         badges.push({
             id: `flag-${cat.rescueFlags[0]}`,
@@ -145,15 +155,6 @@ const getBadgeMeta = (cat: Cat): BadgeMeta[] => {
             label: 'Intact',
             background: 'rgba(255, 184, 69, 0.95)',
             text: '#3D2100',
-        });
-    }
-
-    if ((cat.status ?? '').toLowerCase() === 'needs help') {
-        badges.push({
-            id: 'needs-help',
-            label: 'Needs Help',
-            background: 'rgba(255, 107, 107, 0.95)',
-            text: '#360000',
         });
     }
 

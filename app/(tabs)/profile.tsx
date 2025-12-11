@@ -2,15 +2,18 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
 
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import placeholderAvatar from '@/userPlaceholder.png';
 
 export default function ProfileScreen() {
     const [session, setSession] = useState<Session | null>(null);
-    const { isDark } = useTheme();
+    const { isDark, preference, setPreference } = useTheme();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,22 +26,93 @@ export default function ProfileScreen() {
         // Navigation will be handled by the onAuthStateChange in _layout.tsx
     };
 
-    const user = {
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [locationEnabled, setLocationEnabled] = useState(false);
+    const [darkModeEnabled, setDarkModeEnabled] = useState(preference === 'dark');
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadPermissions = async () => {
+            const notificationSettings = await Notifications.getPermissionsAsync();
+            const hasNotificationPermission =
+                notificationSettings.granted ||
+                notificationSettings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+
+            const locationSettings = await Location.getForegroundPermissionsAsync();
+            if (isMounted) {
+                setNotificationsEnabled(Boolean(hasNotificationPermission));
+                setLocationEnabled(locationSettings.status === Location.PermissionStatus.GRANTED);
+            }
+        };
+
+        loadPermissions();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        setDarkModeEnabled(preference === 'dark');
+    }, [preference]);
+
+    const handleNotificationToggle = async (value: boolean) => {
+        if (value) {
+            const permission = await Notifications.requestPermissionsAsync();
+            const granted =
+                permission.granted ||
+                permission.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+            setNotificationsEnabled(granted);
+            if (!granted) {
+                Alert.alert('Permission needed', 'Enable notifications in system settings to stay informed.');
+            }
+        } else {
+            setNotificationsEnabled(false);
+            if (Platform.OS !== 'web') {
+                Linking.openSettings();
+            }
+        }
+    };
+
+    const handleLocationToggle = async (value: boolean) => {
+        if (value) {
+            const permission = await Location.requestForegroundPermissionsAsync();
+            const granted = permission.status === Location.PermissionStatus.GRANTED;
+            setLocationEnabled(granted);
+            if (!granted) {
+                Alert.alert('Permission needed', 'Location access keeps your alerts relevant. You can enable it in Settings.');
+            }
+        } else {
+            setLocationEnabled(false);
+            if (Platform.OS !== 'web') {
+                Linking.openSettings();
+            }
+        }
+    };
+
+    const handleDarkModeToggle = (value: boolean) => {
+        setDarkModeEnabled(value);
+        setPreference(value ? 'dark' : 'light');
+    };
+
+    const user = useMemo(() => ({
         name: session?.user?.email?.split('@')[0] || 'Alex D.',
         role: 'Community Guardian',
-        avatar: session?.user?.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+        avatarUri: session?.user?.user_metadata?.avatar_url,
         stats: {
             sightings: 42,
             fed: 156,
             adopted: 2
         }
-    };
+    }), [session?.user?.email, session?.user?.user_metadata?.avatar_url]);
+
+    const avatarSource = user.avatarUri ? { uri: user.avatarUri } : placeholderAvatar;
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                    <Image source={avatarSource} style={styles.avatar} />
                     <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.name}</Text>
                     <Text style={styles.role}>{user.role}</Text>
                     <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 5 }}>{session?.user?.email}</Text>
@@ -69,21 +143,51 @@ export default function ProfileScreen() {
                     <Text style={[styles.sectionTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Preferences</Text>
 
                     <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
-                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Notifications</Text>
-                            <GlassButton icon="bell" style={styles.iconBtn} />
+                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
+                            <View>
+                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Notifications</Text>
+                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    Receive feeding reminders & alerts
+                                </Text>
+                            </View>
+                            <Switch
+                                value={notificationsEnabled}
+                                onValueChange={handleNotificationToggle}
+                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                thumbColor="#FFFFFF"
+                            />
                         </View>
                     </GlassView>
                     <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
-                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Location Settings</Text>
-                            <GlassButton icon="location" style={styles.iconBtn} />
+                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
+                            <View>
+                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Location Settings</Text>
+                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    Allow location-aware tips
+                                </Text>
+                            </View>
+                            <Switch
+                                value={locationEnabled}
+                                onValueChange={handleLocationToggle}
+                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                thumbColor="#FFFFFF"
+                            />
                         </View>
                     </GlassView>
                     <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', backgroundColor: isDark ? 'transparent' : '#FFFFFF', padding: 16, borderRadius: 16 }}>
-                            <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Dark Mode</Text>
-                            <GlassButton icon="moon.fill" style={styles.iconBtn} />
+                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
+                            <View>
+                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Dark Mode</Text>
+                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    Override system appearance
+                                </Text>
+                            </View>
+                            <Switch
+                                value={darkModeEnabled}
+                                onValueChange={handleDarkModeToggle}
+                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                thumbColor="#FFFFFF"
+                            />
                         </View>
                     </GlassView>
                 </View>
@@ -180,6 +284,18 @@ const styles = StyleSheet.create({
     menuText: {
         fontSize: 16,
         // color: Colors.glass.text,
+    },
+    menuHint: {
+        fontSize: 12,
+        marginTop: 4,
+    },
+    preferenceRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        padding: 16,
+        borderRadius: 16,
     },
     iconBtn: {
         height: 40,

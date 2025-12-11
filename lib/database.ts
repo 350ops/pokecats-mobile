@@ -41,7 +41,10 @@ export const addCat = async (name: string, description: string, image: string, l
     if (error) console.error('Error adding cat:', error);
 };
 
-export const updateCat = async (id: number, updates: { latitude?: number; longitude?: number; lastFed?: string; lastSighted?: string; status?: string; rescueFlags?: string[]; locationDescription?: string; colorProfile?: string[]; tnrStatus?: boolean }) => {
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
+
+export const updateCat = async (id: number, updates: { latitude?: number; longitude?: number; lastFed?: string; lastSighted?: string; status?: string; rescueFlags?: string[]; locationDescription?: string; colorProfile?: string[]; tnrStatus?: boolean; description?: string; image?: string }) => {
     const dbUpdates: any = {};
     if (updates.latitude) dbUpdates.latitude = updates.latitude;
     if (updates.longitude) dbUpdates.longitude = updates.longitude;
@@ -52,6 +55,8 @@ export const updateCat = async (id: number, updates: { latitude?: number; longit
     if (updates.locationDescription) dbUpdates.location_description = updates.locationDescription;
     if (updates.colorProfile) dbUpdates.color_profile = updates.colorProfile;
     if (typeof updates.tnrStatus === 'boolean') dbUpdates.tnr_status = updates.tnrStatus;
+    if (updates.description) dbUpdates.description = updates.description;
+    if (updates.image) dbUpdates.image = updates.image;
 
     const { error } = await supabase
         .from('cats')
@@ -59,6 +64,29 @@ export const updateCat = async (id: number, updates: { latitude?: number; longit
         .eq('id', id);
 
     if (error) console.error('Error updating cat:', error);
+};
+
+export const uploadCatImage = async (uri: string): Promise<string | null> => {
+    try {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const filePath = `cat_${Date.now()}.jpg`;
+        const contentType = 'image/jpeg';
+
+        const { data, error } = await supabase.storage
+            .from('cat-photos')
+            .upload(filePath, decode(base64), { contentType });
+
+        if (error) {
+            console.error('Upload Error:', error);
+            return null;
+        }
+
+        const { data: publicData } = supabase.storage.from('cat-photos').getPublicUrl(filePath);
+        return publicData.publicUrl;
+    } catch (e) {
+        console.error('FileSystem Error:', e);
+        return null;
+    }
 };
 
 export const getCat = async (id: number) => {
@@ -136,6 +164,7 @@ export const getCats = async () => {
 };
 
 export const addFeeding = async (catId: number, foodType: string, amount: string, shared: boolean) => {
+    // 1. Add feeding record
     const { error } = await supabase
         .from('cat_feedings')
         .insert({
@@ -145,15 +174,26 @@ export const addFeeding = async (catId: number, foodType: string, amount: string
             shared_with_others: shared
         });
 
-    if (error) console.error('Error adding feeding:', error);
+    if (error) {
+        console.error('Error adding feeding:', error);
+        return;
+    }
+
+    // 2. Update cat's last_fed timestamp
+    const { error: updateError } = await supabase
+        .from('cats')
+        .update({ last_fed: new Date().toISOString() })
+        .eq('id', catId);
+
+    if (updateError) console.error('Error updating cat last_fed:', updateError);
 };
 
 export const seedDatabase = async () => {
     console.log('Resetting and Seeding Supabase...');
 
-    // 1. Clear existing data to remove random/sea locations
-    const { error: deleteError } = await supabase.from('cats').delete().neq('id', 0);
-    if (deleteError) console.error('Error clearing cats:', deleteError);
+    // 1. We keep existing data but update it to match our mock data (UPSERT)
+    // This prevents "Key not present" errors if the UI is holding onto an ID that gets deleted.
+    // We do NOT delete everything first anymore.
 
     const parseRelativeToISO = (value?: string | Date) => {
         if (!value) return null;
@@ -189,6 +229,7 @@ export const seedDatabase = async () => {
     // Try inserting with all fields first
     const fullPayload = specificCats.map((cat) => {
         const basePayload: any = {
+            id: parseInt(cat.id), // CRITICAL: Use stable IDs from MockData
             name: cat.name,
             breed: cat.breed || 'Unknown',
             status: cat.status,
@@ -200,7 +241,7 @@ export const seedDatabase = async () => {
             last_sighted: parseRelativeToISO(cat.lastSighted),
             tnr_status: cat.tnrStatus ?? false,
         };
-        
+
         // Include optional columns if they exist
         if (cat.locationDescription !== undefined) {
             basePayload.location_description = cat.locationDescription;
@@ -211,18 +252,20 @@ export const seedDatabase = async () => {
         if (cat.colorProfile !== undefined) {
             basePayload.color_profile = cat.colorProfile;
         }
-        
+
         return basePayload;
     });
 
-    let { error: insertError } = await supabase.from('cats').insert(fullPayload);
-    
+    // UPSERT instead of INSERT
+    let { error: insertError } = await supabase.from('cats').upsert(fullPayload);
+
     // If insert failed due to missing columns, retry with only basic fields
     if (insertError && (insertError.message?.includes('color_profile') || insertError.message?.includes('rescue_flags') || insertError.message?.includes('location_description') || insertError.message?.includes('tnr_status'))) {
         console.warn('⚠️  Some database columns are missing. Inserting with basic fields only. Run add_missing_columns.sql in Supabase SQL editor to enable all features.');
-        
+
         // Retry with only basic fields that should always exist
         const basicPayload = specificCats.map((cat) => ({
+            id: parseInt(cat.id), // CRITICAL: Use stable IDs
             name: cat.name,
             breed: cat.breed || 'Unknown',
             status: cat.status,
@@ -233,17 +276,17 @@ export const seedDatabase = async () => {
             last_fed: cat.lastFed ? cat.lastFed.toISOString() : null,
             last_sighted: parseRelativeToISO(cat.lastSighted),
         }));
-        
-        const { error: basicError } = await supabase.from('cats').insert(basicPayload);
+
+        const { error: basicError } = await supabase.from('cats').upsert(basicPayload);
         if (basicError) {
-            console.error('Error inserting cats (basic fields):', basicError);
+            console.error('Error upserting cats (basic fields):', basicError);
         } else {
-            console.log('✓ Successfully inserted cats with basic fields');
+            console.log('✓ Successfully upserted cats with basic fields');
         }
     } else if (insertError) {
-        console.error('Error inserting cats:', insertError);
+        console.error('Error upserting cats:', insertError);
     } else {
-        console.log('✓ Successfully inserted cats with all fields');
+        console.log('✓ Successfully upserted cats with all fields');
     }
 };
 

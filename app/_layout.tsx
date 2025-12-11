@@ -6,7 +6,11 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { initDatabase, seedDatabase } from '@/lib/database';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
 
 const CustomDarkTheme: Theme = {
   ...DarkTheme,
@@ -47,6 +51,12 @@ function RootLayoutContent() {
     // 1. Initialize DB structure (Schema is server-side, this is just a log)
     initDatabase();
   }, []);
+
+  useEffect(() => {
+    if (initialized) {
+      SplashScreen.hideAsync();
+    }
+  }, [initialized]);
 
   useEffect(() => {
     // 2. Check Auth Session
@@ -94,6 +104,8 @@ function RootLayoutContent() {
       }
     }
   }, [session, initialized, segments]);
+
+  // Native splash screen is handled by preventAutoHideAsync and hideAsync above.
 
   return (
     <ThemeProvider value={isDark ? CustomDarkTheme : CustomLightTheme}>

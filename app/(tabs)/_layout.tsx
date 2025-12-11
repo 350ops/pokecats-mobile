@@ -30,7 +30,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="report"
         options={{
-          title: 'Report',
+          title: 'Add Cat',
         }}
       />
       <Tabs.Screen

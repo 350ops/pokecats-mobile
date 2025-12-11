@@ -1,6 +1,7 @@
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
+import { getCatStatusState } from '@/lib/cat_logic';
 import { addFeeding, getCats, updateCat } from '@/lib/database';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -131,6 +132,16 @@ export default function MapScreen() {
         });
     }, [cats, activeFilters]);
 
+    const getJitter = (id: number | string) => {
+        const numId = Number(id);
+        if (!jitterCacheRef.current.has(numId)) {
+            const latOff = (Math.sin(numId) * 0.00015);
+            const lonOff = (Math.cos(numId) * 0.00015);
+            jitterCacheRef.current.set(numId, { latitude: latOff, longitude: lonOff });
+        }
+        return jitterCacheRef.current.get(numId)!;
+    };
+
     useEffect(() => {
         if (!filteredCats.length) {
             setSelectedCatId(null);
@@ -224,10 +235,10 @@ export default function MapScreen() {
                 prev.map((item) =>
                     item.id === cat.id
                         ? {
-                              ...item,
-                              lastFed: new Date(timestamp),
-                              timesFed: (item.timesFed ?? 0) + 1,
-                          }
+                            ...item,
+                            lastFed: new Date(timestamp),
+                            timesFed: (item.timesFed ?? 0) + 1,
+                        }
                         : item
                 )
             );
@@ -326,6 +337,8 @@ export default function MapScreen() {
         });
         const { precise } = getDisplayCoordinate(item);
         const isLast = index === filteredCats.length - 1;
+        const statusState = getCatStatusState(item as any); // Calculate status
+
         return (
             <Animated.View
                 style={{
@@ -348,9 +361,12 @@ export default function MapScreen() {
                                     </Text>
                                     <View style={[
                                         styles.statusBadge,
-                                        (item.status ?? '').toLowerCase() === 'needs help' ? styles.statusBadgeAlert : styles.statusBadgeOk
+                                        { backgroundColor: statusState.statusColor }
                                     ]}>
-                                        <Text style={styles.statusBadgeText}>{item.status ?? 'Unknown'}</Text>
+                                        <Text style={[
+                                            styles.statusBadgeText,
+                                            { color: statusState.labelColor }
+                                        ]}>{statusState.statusText}</Text>
                                     </View>
                                 </View>
                                 <Text style={[styles.catBreed, { color: secondaryTextColor }]} numberOfLines={1}>
@@ -379,33 +395,29 @@ export default function MapScreen() {
                         ) : null}
 
                         <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>
-                            {(() => {
-                                const lastFedColor = getFedSeverityColor(item.lastFed, isDark);
-                                return (
-                                    <StatRow
-                                        icon="fork.knife"
-                                        label="Last Fed"
-                                        value={getTimeAgo(item.lastFed)}
-                                        tint={lastFedColor}
-                                        valueColor={primaryTextColor}
-                                        dynamicLabelColor={lastFedColor}
-                                    />
-                                );
-                            })()}
+                            <StatRow
+                                icon="fork.knife"
+                                label="Last Fed"
+                                value={getTimeAgo(item.lastFed)}
+                                tint={statusState.markerColor === 'green' ? '#34C759' : statusState.markerColor === 'orange' ? '#F4B63E' : '#FF6B6B'}
+                                valueColor={primaryTextColor}
+                                dynamicLabelColor={primaryTextColor}
+                            />
                             <StatRow
                                 icon="eye.fill"
                                 label="Seen"
                                 value={getTimeAgo(item.lastSighted)}
-                                tint={isDark ? Colors.glass.text : Colors.light.icon}
+                                tint="#34C759"
                                 valueColor={primaryTextColor}
+                                dynamicLabelColor={primaryTextColor}
                             />
                             <StatRow
                                 icon={item.tnrStatus ? 'checkmark.shield.fill' : 'exclamationmark.shield.fill'}
                                 label="TNR"
                                 value={item.tnrStatus ? 'Sterilized' : 'Intact'}
-                                tint={item.tnrStatus ? Colors.primary.green : Colors.primary.blue}
-                                valueColor={item.tnrStatus ? Colors.primary.green : subduedTextColor}
-                                dynamicLabelColor={item.tnrStatus ? Colors.primary.green : subduedTextColor}
+                                tint={Colors.primary.blue}
+                                valueColor={primaryTextColor}
+                                dynamicLabelColor={primaryTextColor}
                             />
                         </View>
 
@@ -455,22 +467,37 @@ export default function MapScreen() {
                 {filteredCats.map((cat) => {
                     const { coordinate } = getDisplayCoordinate(cat);
                     const isSelected = selectedCatId === cat.id;
+                    const jitter = getJitter(cat.id);
+                    // Cast cat to any or update logic type, since logic expects string ID from Mock but DB uses number.
+                    // Actually, logic.ts expects Partial<Cat> where id is string.
+                    // We can cast or update logic. Let's fix logic type in a separate step or cast here.
+                    const statusState = getCatStatusState(cat as any);
+
                     return (
                         <Marker
                             key={cat.id}
-                            coordinate={coordinate}
+                            coordinate={{
+                                latitude: coordinate.latitude + jitter.latitude,
+                                longitude: coordinate.longitude + jitter.longitude,
+                            }}
                             onPress={(event) => {
                                 event.stopPropagation();
                                 handleMarkerPress(cat);
                             }}
+                            tracksViewChanges={false}
+                            testID={`marker-${cat.id}`}
                         >
-                            <View
-                                style={[
-                                    styles.markerDot,
-                                    (cat.status ?? '').toLowerCase() === 'needs help' && styles.markerNeedsHelp,
-                                    isSelected && styles.markerSelected,
-                                ]}
-                            />
+                            {/* Simplified Marker View for performance, prioritizing the Ring color */}
+                            <View style={[
+                                styles.markerRing,
+                                isSelected && styles.markerRingActive,
+                                { borderColor: statusState.markerColor }
+                            ]}>
+                                <Image
+                                    source={cat.image ? { uri: cat.image } : CAT_FALLBACK}
+                                    style={styles.markerImage}
+                                />
+                            </View>
                         </Marker>
                     );
                 })}
@@ -515,7 +542,7 @@ export default function MapScreen() {
                     style={[
                         styles.carousel,
                         {
-                            bottom: CAROUSEL_BOTTOM_OFFSET + insets.bottom -70,
+                            bottom: CAROUSEL_BOTTOM_OFFSET + insets.bottom - 70,
                             paddingBottom: insets.bottom,
                         },
                     ]}
@@ -732,7 +759,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#333',
+        backgroundColor: '#333333',
     },
     cardHeaderRow: {
         flexDirection: 'row',
@@ -754,10 +781,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     statusBadgeOk: {
-        backgroundColor: 'rgba(103, 206, 103, 0.2)',
+        backgroundColor: 'rgba(93, 194, 62, 1)',
     },
     statusBadgeAlert: {
-        backgroundColor: 'rgba(255, 107, 107, 0.2)',
+        backgroundColor: 'rgba(255, 48, 48, 0.8)',
     },
     statusBadgeText: {
         color: Colors.glass.text,
@@ -829,5 +856,29 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 13,
         fontWeight: '600',
+    },
+    markerRing: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        borderWidth: 3,
+        borderColor: 'white',
+        backgroundColor: 'white',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: 'black',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    markerRingActive: {
+        transform: [{ scale: 1.25 }],
+        zIndex: 999,
+    },
+    markerImage: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
     },
 });
