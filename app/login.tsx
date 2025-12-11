@@ -1,14 +1,16 @@
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
+import { useTheme } from '@/context/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Image as RNImage, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Image as RNImage, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function LoginScreen() {
+    const { isDark } = useTheme();
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -74,27 +76,23 @@ export default function LoginScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
-            <StatusBar style="light" />
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-                    <View style={styles.logoWrap}>
+                   
+                    <GlassView style={[styles.card, { backgroundColor: isDark ? 'rgba(30, 30, 30, 0.6)' : 'rgba(0, 115, 255, 0.74)' }]} intensity={90}>
+                <View style={styles.cardContent}>
+                    
+                <View style={styles.logoWrap}>
                         <RNImage source={require('@/assets/images/logo.png')} style={styles.logo} resizeMode="contain" />
                     </View>
-                    <GlassView style={styles.card} intensity={90}>
-                <View style={styles.cardContent}>
-                    <View style={styles.iconContainer}>
-                        <SymbolView name="pawprint.fill" size={50} tintColor={Colors.primary.green} />
-                    </View>
-
-                    <Text style={styles.title}>{isSignUp ? 'Create Account' : 'Welcome Back'}</Text>
-                    <Text style={styles.subtitle}>{isSignUp ? 'Join the community' : 'Login to continue'}</Text>
-
+             
                     <View style={styles.inputContainer}>
-                        <View style={styles.inputWrapper}>
+                        <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
                             <SymbolView name="envelope.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: 'white' }]}
                                 placeholder="Email"
                                 placeholderTextColor={Colors.glass.textSecondary}
                                 value={email}
@@ -103,10 +101,10 @@ export default function LoginScreen() {
                                 keyboardType="email-address"
                             />
                         </View>
-                        <View style={styles.inputWrapper}>
+                        <View style={[styles.inputWrapper, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255,255,255,0.15)' }]}>
                             <SymbolView name="lock.fill" size={20} tintColor={Colors.glass.textSecondary} style={styles.inputIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { color: 'white' }]}
                                 placeholder="Password"
                                 placeholderTextColor={Colors.glass.textSecondary}
                                 value={password}
@@ -142,7 +140,7 @@ export default function LoginScreen() {
                     </View>
 
                     <Text
-                        style={styles.switchText}
+                        style={[styles.switchText, { color: Colors.glass.textSecondary }]}
                         onPress={() => setIsSignUp(!isSignUp)}
                     >
                         {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
@@ -159,7 +157,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: Colors.primary.dark,
     },
     scrollContent: {
         flexGrow: 1,
@@ -178,7 +175,6 @@ const styles = StyleSheet.create({
     },
     card: {
         borderRadius: 30,
-        backgroundColor: 'rgba(30, 30, 30, 0.6)',
         borderWidth: 1,
         borderColor: Colors.glass.border,
         width: '100%',
@@ -191,18 +187,16 @@ const styles = StyleSheet.create({
     },
     iconContainer: {
         marginBottom: 5,
-        backgroundColor: 'rgba(57, 255, 20, 0.1)',
+        backgroundColor: 'rgb(195, 195, 195)',
         padding: 15,
         borderRadius: 50,
     },
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: 'white',
     },
     subtitle: {
         fontSize: 16,
-        color: Colors.glass.textSecondary,
         marginBottom: 10,
     },
     inputContainer: {
@@ -212,11 +206,9 @@ const styles = StyleSheet.create({
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
         borderRadius: 16,
         paddingHorizontal: 15,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
         height: 60, // Fixed height for consistency
     },
     inputIcon: {
@@ -227,7 +219,6 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         height: '100%', // Fill the wrapper height
-        color: 'white',
         fontSize: 16,
     },
     buttonContainer: {
@@ -240,13 +231,12 @@ const styles = StyleSheet.create({
         borderRadius: 16,
     },
     switchText: {
-        color: Colors.glass.textSecondary,
         marginTop: 20,
         fontSize: 14,
         textAlign: 'center',
     },
     switchTextBold: {
-        color: Colors.primary.green,
+        color: Colors.light.background,
         fontWeight: 'bold',
     },
     appleWrapper: {

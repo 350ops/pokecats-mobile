@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { initDatabase, seedDatabase } from '@/lib/database';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const CustomDarkTheme: Theme = {
   ...DarkTheme,
@@ -64,6 +64,9 @@ function RootLayoutContent() {
   }, []);
 
   // Handle Protection and Seeding
+  const hasSeededRef = useRef(false);
+  const shouldAutoSeed = process.env.EXPO_PUBLIC_AUTO_SEED === 'true' || (__DEV__ && process.env.EXPO_PUBLIC_AUTO_SEED !== 'false');
+
   useEffect(() => {
     if (!initialized) return;
 
@@ -73,8 +76,11 @@ function RootLayoutContent() {
 
     if (session) {
       // User is logged in
-      // Try to seed data now that we have auth (if needed)
-      seedDatabase();
+      // Only seed when explicitly allowed (or in dev by default)
+      if (shouldAutoSeed && !hasSeededRef.current) {
+        hasSeededRef.current = true;
+        seedDatabase();
+      }
 
       // If on login screen, go to tabs
       if (inLoginGroup) {

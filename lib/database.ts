@@ -186,24 +186,65 @@ export const seedDatabase = async () => {
         { ...MOCK_CATS[8], lat: 25.3660, lon: 51.5540 },
     ];
 
-    const payload = specificCats.map((cat, index) => ({
-        name: cat.name,
-        breed: cat.breed,
-        status: cat.status,
-        description: cat.description,
-        image: cat.image,
-        latitude: cat.lat,
-        longitude: cat.lon,
-        last_fed: cat.lastFed ? cat.lastFed.toISOString() : null,
-        last_sighted: parseRelativeToISO(cat.lastSighted),
-        location_description: cat.locationDescription ?? `${cat.name} was last reported near the community.`,
-        rescue_flags: cat.rescueFlags ?? [],
-        color_profile: cat.colorProfile ?? [],
-        tnr_status: cat.tnrStatus ?? false,
-    }));
+    // Try inserting with all fields first
+    const fullPayload = specificCats.map((cat) => {
+        const basePayload: any = {
+            name: cat.name,
+            breed: cat.breed || 'Unknown',
+            status: cat.status,
+            description: cat.description,
+            image: cat.image,
+            latitude: cat.lat,
+            longitude: cat.lon,
+            last_fed: cat.lastFed ? cat.lastFed.toISOString() : null,
+            last_sighted: parseRelativeToISO(cat.lastSighted),
+            tnr_status: cat.tnrStatus ?? false,
+        };
+        
+        // Include optional columns if they exist
+        if (cat.locationDescription !== undefined) {
+            basePayload.location_description = cat.locationDescription;
+        }
+        if (cat.rescueFlags !== undefined) {
+            basePayload.rescue_flags = cat.rescueFlags;
+        }
+        if (cat.colorProfile !== undefined) {
+            basePayload.color_profile = cat.colorProfile;
+        }
+        
+        return basePayload;
+    });
 
-    const { error: insertError } = await supabase.from('cats').insert(payload);
-    if (insertError) console.error('Error inserting cats:', insertError);
+    let { error: insertError } = await supabase.from('cats').insert(fullPayload);
+    
+    // If insert failed due to missing columns, retry with only basic fields
+    if (insertError && (insertError.message?.includes('color_profile') || insertError.message?.includes('rescue_flags') || insertError.message?.includes('location_description') || insertError.message?.includes('tnr_status'))) {
+        console.warn('⚠️  Some database columns are missing. Inserting with basic fields only. Run add_missing_columns.sql in Supabase SQL editor to enable all features.');
+        
+        // Retry with only basic fields that should always exist
+        const basicPayload = specificCats.map((cat) => ({
+            name: cat.name,
+            breed: cat.breed || 'Unknown',
+            status: cat.status,
+            description: cat.description,
+            image: cat.image,
+            latitude: cat.lat,
+            longitude: cat.lon,
+            last_fed: cat.lastFed ? cat.lastFed.toISOString() : null,
+            last_sighted: parseRelativeToISO(cat.lastSighted),
+        }));
+        
+        const { error: basicError } = await supabase.from('cats').insert(basicPayload);
+        if (basicError) {
+            console.error('Error inserting cats (basic fields):', basicError);
+        } else {
+            console.log('✓ Successfully inserted cats with basic fields');
+        }
+    } else if (insertError) {
+        console.error('Error inserting cats:', insertError);
+    } else {
+        console.log('✓ Successfully inserted cats with all fields');
+    }
 };
 
 export const submitQuickReport = async (payload: QuickReportPayload) => {

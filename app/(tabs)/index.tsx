@@ -4,8 +4,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { addFeeding, getCats, updateCat } from '@/lib/database';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Alert, Dimensions, FlatList, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Dimensions, FlatList, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,6 +36,7 @@ type FilterDefinition = {
     predicate: (cat: MapCat) => boolean;
 };
 
+type SymbolName = ComponentProps<typeof SymbolView>['name'];
 const CURRENT_USER_ID = 42;
 const CARD_HORIZONTAL_MARGIN = 20;
 const CARD_SPACING = 12;
@@ -91,6 +93,11 @@ export default function MapScreen() {
     const carouselRef = useRef<FlatList<MapCat>>(null);
     const jitterCacheRef = useRef<Map<number, { latitude: number; longitude: number }>>(new Map());
     const scrollX = useRef(new Animated.Value(0)).current;
+    const primaryTextColor = isDark ? Colors.glass.text : Colors.primary.dark;
+    const secondaryTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
+    const subduedTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.5)';
+    const cardSurface = isDark ? Colors.glass.background : 'rgba(255,255,255,0.9)';
+    const statSurface = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
 
     useFocusEffect(
         useCallback(() => {
@@ -195,14 +202,14 @@ export default function MapScreen() {
         );
     }
 
-    const getFedStatusColor = (dateValue?: string | Date | null) => {
-        if (!dateValue) return Colors.glass.textSecondary;
+    const getFedSeverityColor = (dateValue?: string | Date | null, isDarkMode?: boolean) => {
+        if (!dateValue) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
         const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
-        if (!(date instanceof Date) || isNaN(date.getTime())) return Colors.glass.textSecondary;
+        if (!(date instanceof Date) || isNaN(date.getTime())) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
         const hours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
-        if (hours < 4) return Colors.primary.green;
-        if (hours > 12) return '#FF6B6B';
-        return Colors.primary.yellow;
+        if (hours < 12) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
+        if (hours < 18) return '#F4B63E';
+        return '#FF6B6B';
     };
 
     const handleFeedCat = async (cat: MapCat) => {
@@ -327,7 +334,7 @@ export default function MapScreen() {
                     marginRight: isLast ? 0 : CARD_SPACING,
                 }}
             >
-                <GlassView intensity={80} style={styles.cardShell}>
+                <GlassView intensity={80} style={[styles.cardShell, { backgroundColor: cardSurface }]}>
                     <Pressable onPress={() => router.push(`/cat/${item.id}`)} style={{ flex: 1 }}>
                         <View style={styles.cardHeader}>
                             <Image
@@ -336,7 +343,7 @@ export default function MapScreen() {
                             />
                             <View style={{ flex: 1 }}>
                                 <View style={styles.cardHeaderRow}>
-                                    <Text style={[styles.catName, { color: isDark ? Colors.glass.text : Colors.light.text }]} numberOfLines={1}>
+                                    <Text style={[styles.catName, { color: primaryTextColor }]} numberOfLines={1}>
                                         {item.name}
                                     </Text>
                                     <View style={[
@@ -346,7 +353,7 @@ export default function MapScreen() {
                                         <Text style={styles.statusBadgeText}>{item.status ?? 'Unknown'}</Text>
                                     </View>
                                 </View>
-                                <Text style={[styles.catBreed, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]} numberOfLines={1}>
+                                <Text style={[styles.catBreed, { color: secondaryTextColor }]} numberOfLines={1}>
                                     {item.breed ?? 'Unknown'}
                                 </Text>
                             </View>
@@ -358,45 +365,47 @@ export default function MapScreen() {
                                 tintColor={precise ? Colors.primary.green : Colors.primary.yellow}
                                 size={18}
                             />
-                            <Text style={[styles.locationLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                            <Text style={[styles.locationLabel, { color: secondaryTextColor }]}>
                                 {catLocationCopy(item, precise)}
                             </Text>
                         </View>
 
                         {item.rescueFlags?.length ? (
-                            <View style={styles.flagRow}>
-                                {item.rescueFlags.slice(0, 2).map((flag) => (
-                                    <View key={flag} style={styles.flagChip}>
-                                        <Text style={styles.flagChipText}>{flag}</Text>
-                                    </View>
-                                ))}
-                            </View>
+                            <Text style={[styles.tagline, { color: secondaryTextColor }]}>
+                                {item.rescueFlags[0]
+                                    ? item.rescueFlags[0].charAt(0).toUpperCase() + item.rescueFlags[0].slice(1)
+                                    : ''}
+                            </Text>
                         ) : null}
 
-                        <View style={styles.statsBlock}>
-                            <StatRow
-                                icon="fork.knife"
-                                label="Last Fed"
-                                value={getTimeAgo(item.lastFed)}
-                                tint={getFedStatusColor(item.lastFed)}
-                            />
-                            <StatRow
-                                icon="number.square"
-                                label="Times Fed"
-                                value={`${item.timesFed ?? 0}`}
-                                tint={Colors.primary.green}
-                            />
+                        <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>
+                            {(() => {
+                                const lastFedColor = getFedSeverityColor(item.lastFed, isDark);
+                                return (
+                                    <StatRow
+                                        icon="fork.knife"
+                                        label="Last Fed"
+                                        value={getTimeAgo(item.lastFed)}
+                                        tint={lastFedColor}
+                                        valueColor={primaryTextColor}
+                                        dynamicLabelColor={lastFedColor}
+                                    />
+                                );
+                            })()}
                             <StatRow
                                 icon="eye.fill"
                                 label="Seen"
                                 value={getTimeAgo(item.lastSighted)}
                                 tint={isDark ? Colors.glass.text : Colors.light.icon}
+                                valueColor={primaryTextColor}
                             />
                             <StatRow
                                 icon={item.tnrStatus ? 'checkmark.shield.fill' : 'exclamationmark.shield.fill'}
                                 label="TNR"
                                 value={item.tnrStatus ? 'Sterilized' : 'Intact'}
-                                tint={item.tnrStatus ? Colors.primary.green : Colors.primary.yellow}
+                                tint={item.tnrStatus ? Colors.primary.green : Colors.primary.blue}
+                                valueColor={item.tnrStatus ? Colors.primary.green : subduedTextColor}
+                                dynamicLabelColor={item.tnrStatus ? Colors.primary.green : subduedTextColor}
                             />
                         </View>
 
@@ -406,17 +415,26 @@ export default function MapScreen() {
                                 label={feedingCatId === item.id ? 'Logging…' : 'Fed'}
                                 onPress={() => handleFeedCat(item)}
                                 disabled={feedingCatId === item.id}
+                                textColor={primaryTextColor}
+                                iconColor={primaryTextColor}
+                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
                             />
                             <MapActionButton
                                 icon="cross.case.fill"
-                                label={(item.status ?? '').toLowerCase() === 'needs help' ? 'Mark Stable' : 'Needs Help'}
+                                label={(item.status ?? '').toLowerCase() === 'needs help' ? 'Mark Stable' : 'Help'}
                                 onPress={() => promptNeedsHelp(item)}
                                 disabled={statusUpdatingCatId === item.id}
+                                textColor={primaryTextColor}
+                                iconColor={primaryTextColor}
+                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
                             />
                             <MapActionButton
                                 icon="location.fill"
-                                label="Navigate"
+                                label="Go"
                                 onPress={() => handleNavigate(item)}
+                                textColor={primaryTextColor}
+                                iconColor={primaryTextColor}
+                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
                             />
                         </View>
                     </Pressable>
@@ -467,6 +485,7 @@ export default function MapScreen() {
                                 label={filter.label}
                                 active={activeFilters.has(filter.id)}
                                 onPress={() => toggleFilter(filter.id)}
+                                textColor={primaryTextColor}
                             />
                         ))}
                     </ScrollView>
@@ -474,12 +493,12 @@ export default function MapScreen() {
             </View>
 
             <GlassView style={styles.overlay} intensity={60}>
-                <Text style={[styles.overlayText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{catCountLabel}</Text>
+                <Text style={[styles.overlayText, { color: primaryTextColor }]}>{catCountLabel}</Text>
             </GlassView>
 
             {!filteredCats.length && (
                 <View style={styles.emptyState}>
-                    <Text style={{ color: Colors.glass.textSecondary }}>No cats match the selected filters</Text>
+                    <Text style={{ color: secondaryTextColor }}>No cats match the selected filters</Text>
                 </View>
             )}
 
@@ -496,8 +515,8 @@ export default function MapScreen() {
                     style={[
                         styles.carousel,
                         {
-                            bottom: CAROUSEL_BOTTOM_OFFSET + insets.bottom * 0.5,
-                            paddingBottom: insets.bottom + 36,
+                            bottom: CAROUSEL_BOTTOM_OFFSET + insets.bottom -70,
+                            paddingBottom: insets.bottom,
                         },
                     ]}
                     contentContainerStyle={styles.carouselContent}
@@ -517,28 +536,34 @@ const MapActionButton = ({
     label,
     onPress,
     disabled,
+    textColor,
+    iconColor,
+    backgroundColor,
 }: {
-    icon: string;
+    icon: SymbolName;
     label: string;
     onPress: () => void;
     disabled?: boolean;
+    textColor: string;
+    iconColor: string;
+    backgroundColor: string;
 }) => (
     <Pressable
-        style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
+        style={[styles.actionButton, { backgroundColor }, disabled && styles.actionButtonDisabled]}
         onPress={onPress}
         disabled={disabled}
     >
-        <SymbolView name={icon} size={18} tintColor={Colors.glass.text} />
-        <Text style={styles.actionLabel}>{label}</Text>
+        <SymbolView name={icon} size={18} tintColor={iconColor} />
+        <Text style={[styles.actionLabel, { color: textColor }]}>{label}</Text>
     </Pressable>
 );
 
-const MapFilterChip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
+const MapFilterChip = ({ label, active, onPress, textColor }: { label: string; active: boolean; onPress: () => void; textColor: string }) => (
     <Pressable
         onPress={onPress}
         style={[styles.filterChip, active && styles.filterChipActive]}
     >
-        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{label}</Text>
+        <Text style={[styles.filterChipText, { color: textColor }, active && styles.filterChipTextActive]}>{label}</Text>
     </Pressable>
 );
 
@@ -547,18 +572,22 @@ const StatRow = ({
     label,
     value,
     tint,
+    valueColor,
+    dynamicLabelColor,
 }: {
-    icon: string;
+    icon: SymbolName;
     label: string;
     value: string;
     tint: string;
+    valueColor: string;
+    dynamicLabelColor?: string;
 }) => (
     <View style={styles.statRow}>
         <View style={styles.statLabelRow}>
             <SymbolView name={icon} tintColor={tint} size={16} />
-            <Text style={[styles.statLabel, { color: tint }]}>{label}</Text>
+            <Text style={[styles.statLabel, { color: dynamicLabelColor ?? tint }]}>{label}</Text>
         </View>
-        <Text style={styles.statValue}>{value}</Text>
+        <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
     </View>
 );
 
@@ -644,7 +673,6 @@ const styles = StyleSheet.create({
         borderRadius: 20,
     },
     overlayText: {
-        color: Colors.glass.text,
         fontWeight: 'bold',
     },
     filterBarWrapper: {
@@ -742,22 +770,10 @@ const styles = StyleSheet.create({
         gap: 8,
         marginBottom: 14,
     },
-    flagRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 6,
-        marginBottom: 12,
-    },
-    flagChip: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-    },
-    flagChipText: {
-        color: Colors.glass.text,
-        fontSize: 11,
-        fontWeight: '700',
+    tagline: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginBottom: 8,
     },
     locationLabel: {
         fontSize: 13,
@@ -783,14 +799,12 @@ const styles = StyleSheet.create({
         opacity: 0.6,
     },
     actionLabel: {
-        color: Colors.glass.text,
         fontWeight: '600',
         fontSize: 13,
     },
     statsBlock: {
         marginTop: 10,
         borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.05)',
         paddingVertical: 6,
         paddingHorizontal: 4,
         gap: 6,
@@ -815,6 +829,5 @@ const styles = StyleSheet.create({
     statValue: {
         fontSize: 13,
         fontWeight: '600',
-        color: Colors.glass.text,
     },
 });
