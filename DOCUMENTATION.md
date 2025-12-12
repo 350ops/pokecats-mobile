@@ -68,3 +68,30 @@ The app leverages the latest managed workflow capabilities of Expo SDK 54:
 - **Language**: TypeScript (Strict mode).
 - **Styling**: `StyleSheet` with a centralized `Colors` configuration.
 - **Components**: Atomic design with reusable `GlassView` and `GlassButton` primitives.
+
+## 6. Figma MCP (Design Context in Cursor)
+
+### Enable the local MCP server in Figma Desktop
+- **Open Figma Desktop**: Make sure you’re using the desktop app (not just the browser).
+- **Open a design file**: Any file is fine.
+- **Switch to Dev Mode**: Use the Dev Mode toggle (or `Shift + D`).
+- **Enable MCP server**: In the right sidebar, click **Enable desktop MCP server**.
+- **Server URL**: Figma should show it running at `http://127.0.0.1:3845/mcp`.
+
+### Add the MCP server in Cursor
+- **Open Cursor settings**: Command palette → “Cursor Settings”.
+- **Go to MCP**: Open the **MCP** tab/section.
+- **Add Custom MCP**: Paste this config:
+
+```json
+{
+  "mcpServers": {
+    "figma-desktop": {
+      "url": "http://127.0.0.1:3845/mcp"
+    }
+  }
+}
+```
+
+### Notes
+- **Local-only**: `127.0.0.1` means *each developer* must enable/run the Figma desktop MCP server on their own machine.
