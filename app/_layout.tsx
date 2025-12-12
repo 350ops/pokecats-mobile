@@ -116,6 +116,7 @@ function RootLayoutContent() {
         <Stack.Screen name="cat/[id]" options={{ title: 'Cat Profile', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="cat/[id]/translate" options={{ title: 'Translator', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="update" options={{ title: 'Update Cat', headerBackTitle: 'Back', headerShown: true }} />
+        <Stack.Screen name="profile/edit" options={{ title: 'Edit Profile', headerBackTitle: 'Back', headerShown: true }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </ThemeProvider>
@@ -129,4 +130,3 @@ export default function RootLayout() {
     </AppThemeProvider>
   );
 }
-
