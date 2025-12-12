@@ -114,7 +114,7 @@ export default function TranslateScreen() {
                     ) : translation ? (
                         <GlassView style={styles.translationCard} intensity={50}>
                             <Text style={styles.emoji}>{translation.emoji || "😺"}</Text>
-                            <Text style={styles.translationText}>"{translation.translation}"</Text>
+                            <Text style={styles.translationText}>“{translation.translation}”</Text>
                             <Text style={styles.styleLabel}>{translation.style || "Direct Translation"}</Text>
                         </GlassView>
                     ) : (
