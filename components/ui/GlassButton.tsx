@@ -8,11 +8,13 @@ import { Pressable, PressableProps, StyleSheet, Text, View, ViewStyle } from 're
 interface GlassButtonProps extends PressableProps {
     title?: string;
     icon?: string;
+    iconColor?: string;
     variant?: 'primary' | 'secondary' | 'glass';
 }
 
-export function GlassButton({ title, icon, variant = 'glass', style, ...props }: GlassButtonProps) {
+export function GlassButton({ title, icon, iconColor, variant = 'glass', style, ...props }: GlassButtonProps) {
     const { isDark } = useTheme();
+    const defaultIconColor = isDark ? Colors.glass.text : Colors.light.icon;
 
     return (
         <Pressable
@@ -34,7 +36,12 @@ export function GlassButton({ title, icon, variant = 'glass', style, ...props }:
                     <View style={styles.content}>
                         {icon && (
                             // @ts-ignore: expo-symbols might not have TS types set up perfectly in all environments yet or requires specific icon names
-                            <SymbolView name={icon} tintColor={isDark ? Colors.glass.text : Colors.light.icon} size={24} style={title ? styles.icon : undefined} />
+                            <SymbolView
+                                name={icon}
+                                tintColor={iconColor ?? defaultIconColor}
+                                size={24}
+                                style={title ? styles.icon : undefined}
+                            />
                         )}
                         {title && <Text style={[styles.text, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{title}</Text>}
                     </View>

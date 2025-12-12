@@ -44,6 +44,11 @@ const CARD_HORIZONTAL_MARGIN = 20;
 const CARD_SPACING = 12;
 const CARD_WIDTH = Dimensions.get('window').width - CARD_HORIZONTAL_MARGIN * 2;
 const CAROUSEL_BOTTOM_OFFSET = 110;
+const CARD_MIN_HEIGHT = 240;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+// When we focus the map on a marker we shift the map center slightly south so the marker
+// appears above the bottom carousel card (instead of being covered by it).
+const MAP_FOCUS_VERTICAL_OFFSET_FRACTION = Math.min(0.35, Math.max(0.12, (CARD_MIN_HEIGHT * 0.6) / SCREEN_HEIGHT));
 const CAT_FALLBACK = require('@/assets/images/cat-placeholder.jpg');
 
 const INITIAL_REGION: Region = {
@@ -186,12 +191,18 @@ export default function MapScreen() {
         (cat: MapCat) => {
             if (!mapRef.current) return;
             const { coordinate } = getDisplayCoordinate(cat);
+            // If we don't have a real coordinate, don't try to "focus" the map.
+            if (!coordinate?.latitude || !coordinate?.longitude) return;
+            const latitudeDelta = 0.01;
+            const longitudeDelta = 0.01;
+            const latitudeOffset = latitudeDelta * MAP_FOCUS_VERTICAL_OFFSET_FRACTION;
             mapRef.current.animateToRegion(
                 {
-                    latitude: coordinate.latitude,
+                    // Center slightly south of the marker so the marker is visible above the bottom card.
+                    latitude: coordinate.latitude - latitudeOffset,
                     longitude: coordinate.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
+                    latitudeDelta,
+                    longitudeDelta,
                 },
                 260
             );
