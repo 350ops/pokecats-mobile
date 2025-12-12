@@ -74,7 +74,9 @@ export default function EditProfileScreen() {
     const nextName = name.trim();
     const nextArea = area.trim();
 
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail)) {
+    // NOTE: This is a regex literal, so backslashes should NOT be double-escaped.
+    // `\s` correctly matches whitespace; `\\s` would match a literal "\s".
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail)) {
       Alert.alert('Invalid email', 'Please enter a valid email address.');
       return;
     }
