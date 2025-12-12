@@ -1,0 +1,9 @@
+{
+  "name": "PokecatsTV",
+  "displayName": "Pokecats TV",
+  "reactNativePath": "node_modules/react-native",
+  "tvOS": {
+    "isTVSelectable": true,
+    "bundleIdentifier": "com.mmdev.pokecats.tv"
+  }
+}
