@@ -44,5 +44,6 @@ app-example
 
 # User Requests
 legacy_web/
+apple-tv-app/
 .env
 gen_secret.rb

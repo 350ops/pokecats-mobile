@@ -72,12 +72,9 @@ export function CatCard({ cat }: CatCardProps) {
             <View style={styles.content}>
                 <View style={styles.distanceRow}>
                     <View style={[styles.distancePill, { backgroundColor: distanceMeta.background }]}>
-                        <Text style={[styles.distanceLabel, { color: distanceMeta.text }]}>{distanceMeta.label}</Text>
-                        <Text style={[styles.distanceValue, { color: distanceMeta.text }]}>{distanceMeta.value}</Text>
+                        <Text style={[styles.distanceLabel, { color: distanceMeta.text }]} numberOfLines={1}>{distanceMeta.label}</Text>
+                        <Text style={[styles.distanceValue, { color: distanceMeta.text }]} numberOfLines={1}>{distanceMeta.value}</Text>
                     </View>
-                    <Text style={[styles.statusLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                        {cat.status}
-                    </Text>
                 </View>
 
                 <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]} numberOfLines={1}>
@@ -101,6 +98,7 @@ export function CatCard({ cat }: CatCardProps) {
         </GlassView>
     );
 }
+
 
 const getDistanceMeta = (cat: Cat & { distanceMeters?: number }): DistanceMeta => {
     const meters = cat.distanceMeters ?? parseDistanceFromString(cat.distance);
@@ -279,12 +277,11 @@ const styles = StyleSheet.create({
     },
     distanceRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 4,
     },
     distancePill: {
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         paddingVertical: 6,
         borderRadius: 16,
         flexDirection: 'row',
