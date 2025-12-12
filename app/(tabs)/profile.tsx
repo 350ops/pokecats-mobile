@@ -1,15 +1,16 @@
 import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
+import { VisionOSInlineMenu, type MenuSection } from '@/components/ui/VisionOSMenu';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { useEffect, useMemo, useState } from 'react';
 import placeholderAvatar from '@/userPlaceholder.png';
+import { Session } from '@supabase/supabase-js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export default function ProfileScreen() {
     const [session, setSession] = useState<Session | null>(null);
@@ -108,6 +109,65 @@ export default function ProfileScreen() {
 
     const avatarSource = user.avatarUri ? { uri: user.avatarUri } : placeholderAvatar;
 
+    const openSystemSettings = useCallback(() => {
+        if (Platform.OS !== 'web') {
+            Linking.openSettings();
+        }
+    }, []);
+
+    const preferenceSections: MenuSection[] = useMemo(() => [
+        {
+            id: 'account',
+            title: 'Account',
+            items: [
+                {
+                    id: 'edit-profile',
+                    title: 'Edit Profile',
+                    subtitle: 'Update your photo and name',
+                    icon: 'person.crop.circle',
+                    rightIcon: 'chevron.right',
+                    onPress: () => Alert.alert('Coming Soon', 'Profile editing will be available in a future update.'),
+                },
+                {
+                    id: 'privacy',
+                    title: 'Privacy',
+                    subtitle: 'Control who sees your activity',
+                    icon: 'lock.shield',
+                    rightIcon: 'chevron.right',
+                    onPress: () => Alert.alert('Coming Soon', 'Privacy settings will be available in a future update.'),
+                },
+            ],
+        },
+        {
+            id: 'app',
+            title: 'App Settings',
+            items: [
+                {
+                    id: 'system-settings',
+                    title: 'System Settings',
+                    subtitle: 'Manage permissions in iOS Settings',
+                    icon: 'gear',
+                    rightIcon: 'arrow.up.right',
+                    onPress: openSystemSettings,
+                },
+                {
+                    id: 'help',
+                    title: 'Help & Support',
+                    icon: 'questionmark.circle',
+                    rightIcon: 'chevron.right',
+                    onPress: () => Alert.alert('Help', 'Contact us at support@pokecats.app'),
+                },
+                {
+                    id: 'about',
+                    title: 'About PokéCats',
+                    icon: 'info.circle',
+                    rightText: 'v1.0.1',
+                    onPress: () => Alert.alert('PokéCats', 'Version 1.0.1\n\nHelping communities care for stray cats.'),
+                },
+            ],
+        },
+    ], [openSystemSettings]);
+
     return (
         <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -142,54 +202,67 @@ export default function ProfileScreen() {
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Preferences</Text>
 
-                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
-                            <View>
-                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Notifications</Text>
-                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    Receive feeding reminders & alerts
+                    <VisionOSInlineMenu
+                        sections={preferenceSections}
+                        style={styles.preferencesMenu}
+                    />
+
+                    {/* Toggle controls below menu */}
+                    <View style={styles.togglesContainer}>
+                        <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                            <View style={styles.toggleInfo}>
+                                <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                    Notifications
+                                </Text>
+                                <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    {notificationsEnabled ? 'Enabled' : 'Disabled'}
                                 </Text>
                             </View>
                             <Switch
                                 value={notificationsEnabled}
                                 onValueChange={handleNotificationToggle}
-                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                trackColor={{ false: 'rgba(120,120,128,0.32)', true: Colors.primary.green }}
                                 thumbColor="#FFFFFF"
+                                ios_backgroundColor="rgba(120,120,128,0.32)"
                             />
                         </View>
-                    </GlassView>
-                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
-                            <View>
-                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Location Settings</Text>
-                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    Allow location-aware tips
+
+                        <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                            <View style={styles.toggleInfo}>
+                                <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                    Location Access
+                                </Text>
+                                <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    {locationEnabled ? 'Enabled' : 'Disabled'}
                                 </Text>
                             </View>
                             <Switch
                                 value={locationEnabled}
                                 onValueChange={handleLocationToggle}
-                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                trackColor={{ false: 'rgba(120,120,128,0.32)', true: Colors.primary.green }}
                                 thumbColor="#FFFFFF"
+                                ios_backgroundColor="rgba(120,120,128,0.32)"
                             />
                         </View>
-                    </GlassView>
-                    <GlassView style={styles.menuItem} intensity={isDark ? 30 : 0}>
-                        <View style={[styles.preferenceRow, { backgroundColor: isDark ? 'transparent' : '#FFFFFF' }]}>
-                            <View>
-                                <Text style={[styles.menuText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Dark Mode</Text>
-                                <Text style={[styles.menuHint, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    Override system appearance
+
+                        <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
+                            <View style={styles.toggleInfo}>
+                                <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                    Dark Mode
+                                </Text>
+                                <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    {darkModeEnabled ? 'On' : 'Off'}
                                 </Text>
                             </View>
                             <Switch
                                 value={darkModeEnabled}
                                 onValueChange={handleDarkModeToggle}
-                                trackColor={{ false: 'rgba(0,0,0,0.2)', true: Colors.primary.green }}
+                                trackColor={{ false: 'rgba(120,120,128,0.32)', true: Colors.primary.green }}
                                 thumbColor="#FFFFFF"
+                                ios_backgroundColor="rgba(120,120,128,0.32)"
                             />
                         </View>
-                    </GlassView>
+                    </View>
                 </View>
 
                 <GlassButton
@@ -273,34 +346,33 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         marginLeft: 4,
     },
-    menuItem: {
-        // flexDirection: 'row', // Moved to inner view
-        // justifyContent: 'space-between',
-        // alignItems: 'center',
-        // padding: 16,
-        borderRadius: 16,
-        marginBottom: 12,
+    preferencesMenu: {
+        width: '100%',
+        marginBottom: 20,
     },
-    menuText: {
-        fontSize: 16,
-        // color: Colors.glass.text,
+    togglesContainer: {
+        width: '100%',
+        borderRadius: 14,
+        overflow: 'hidden',
+        gap: 1,
     },
-    menuHint: {
-        fontSize: 12,
-        marginTop: 4,
-    },
-    preferenceRow: {
+    toggleRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        width: '100%',
-        padding: 16,
-        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
     },
-    iconBtn: {
-        height: 40,
-        width: 40,
-        paddingHorizontal: 0,
+    toggleInfo: {
+        flex: 1,
+    },
+    toggleTitle: {
+        fontSize: 17,
+        fontWeight: '400',
+    },
+    toggleSubtitle: {
+        fontSize: 13,
+        marginTop: 2,
     },
     logoutBtn: {
         width: '100%',
