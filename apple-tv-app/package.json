@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "react-native start",
+    "start": "RCT_METRO_PORT=8082 react-native start",
     "ios": "RCT_METRO_PORT=8082 react-native run-ios --scheme PokecatsTV --simulator \"Apple TV\"",
     "tv": "npm run ios",
     "lint": "eslint . --ext .ts,.tsx"
