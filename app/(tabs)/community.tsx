@@ -5,10 +5,19 @@ import { useTheme } from '@/context/ThemeContext';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useMemo, useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type PostCategory = 'Sighting' | 'Medical Alert' | 'Question' | 'Success Story';
+
+const POST_CATEGORIES: PostCategory[] = ['Sighting', 'Question', 'Medical Alert', 'Success Story'];
+
+type Comment = {
+    id: string;
+    user: string;
+    content: string;
+    time: string;
+};
 
 type PostCatRef = {
     id: string;
@@ -24,12 +33,13 @@ type CommunityPost = {
     time: string;
     likes: number;
     comments: number;
+    likedByMe?: boolean;
+    commentThread?: Comment[];
     image?: string;
     category: PostCategory;
     cats?: PostCatRef[];
     isUrgent?: boolean;
-    resolved?: boolean;
-    canResolve?: boolean;
+    isTnr?: boolean;
 };
 
 const POSTS: CommunityPost[] = [
@@ -48,8 +58,11 @@ const POSTS: CommunityPost[] = [
             { id: '8', name: 'Oliver' },
         ],
         isUrgent: false,
-        resolved: false,
-        canResolve: true,
+        isTnr: true,
+        likedByMe: false,
+        commentThread: [
+            { id: 'c1', user: 'Mike R.', content: 'Nice — I saw him yesterday too.', time: '1h' },
+        ],
     },
     {
         id: '2',
@@ -62,8 +75,11 @@ const POSTS: CommunityPost[] = [
         category: 'Question',
         cats: [{ id: '2', name: 'Luna' }],
         isUrgent: true,
-        resolved: false,
-        canResolve: false,
+        isTnr: false,
+        likedByMe: false,
+        commentThread: [
+            { id: 'c2', user: 'Sarah M.', content: 'Not sure — she looked better a few days ago.', time: '3h' },
+        ],
     },
     {
         id: '3',
@@ -77,8 +93,9 @@ const POSTS: CommunityPost[] = [
         category: 'Medical Alert',
         cats: [{ id: 'new-4th', name: '4th Street Kitten' }],
         isUrgent: true,
-        resolved: false,
-        canResolve: true,
+        isTnr: false,
+        likedByMe: false,
+        commentThread: [],
     },
     {
         id: '4',
@@ -91,8 +108,12 @@ const POSTS: CommunityPost[] = [
         category: 'Success Story',
         cats: [{ id: '5', name: 'Shadow', isMine: true }],
         isUrgent: false,
-        resolved: true,
-        canResolve: false,
+        isTnr: true,
+        likedByMe: true,
+        commentThread: [
+            { id: 'c3', user: 'Jenny L.', content: 'Amazing news!', time: '2d' },
+            { id: 'c4', user: 'Sarah M.', content: 'So happy for Shadow.', time: '2d' },
+        ],
     },
 ];
 
@@ -110,11 +131,22 @@ export default function CommunityScreen() {
     const { isDark } = useTheme();
     const [activeFilter, setActiveFilter] = useState<FilterId>('all');
     const [posts, setPosts] = useState<CommunityPost[]>(POSTS);
+    const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
+    const [commentDraft, setCommentDraft] = useState('');
+
+    const [newPostOpen, setNewPostOpen] = useState(false);
+    const [newPostCategory, setNewPostCategory] = useState<PostCategory | null>('Sighting');
+    const [newPostUrgent, setNewPostUrgent] = useState(false);
+    const [newPostTnr, setNewPostTnr] = useState(false);
+    const [newPostContent, setNewPostContent] = useState('');
+    const [newPostImageUrl, setNewPostImageUrl] = useState('');
+    const [newPostCats, setNewPostCats] = useState<string[]>([]);
+    const [newPostCatDraft, setNewPostCatDraft] = useState('');
 
     const filteredPosts = useMemo(() => {
         switch (activeFilter) {
             case 'urgent':
-                return posts.filter((post) => post.isUrgent && !post.resolved);
+                return posts.filter((post) => post.isUrgent);
             case 'mine':
                 return posts.filter((post) => post.cats?.some((cat) => cat.isMine));
             case 'question':
@@ -124,19 +156,135 @@ export default function CommunityScreen() {
         }
     }, [posts, activeFilter]);
 
-    const toggleResolved = (id: string) => {
+    const getCategoryStyle = (category: PostCategory) => {
+        switch (category) {
+            case 'Question':
+                return { bg: '#3F8FF7', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+            case 'Medical Alert':
+                return { bg: '#FF6B6B', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+            case 'Success Story':
+                return { bg: '#67CE67', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+            default:
+                return { bg: '#808080', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+        }
+    };
+
+    const openNewPost = () => {
+        setNewPostCategory('Sighting');
+        setNewPostUrgent(false);
+        setNewPostTnr(false);
+        setNewPostContent('');
+        setNewPostImageUrl('');
+        setNewPostCats([]);
+        setNewPostCatDraft('');
+        setNewPostOpen(true);
+    };
+
+    const closeNewPost = () => {
+        setNewPostOpen(false);
+    };
+
+    const addCatTag = () => {
+        const value = newPostCatDraft.trim();
+        if (!value) return;
+        setNewPostCats((prev) => (prev.includes(value) ? prev : [...prev, value]));
+        setNewPostCatDraft('');
+    };
+
+    const removeCatTag = (name: string) => {
+        setNewPostCats((prev) => prev.filter((x) => x !== name));
+    };
+
+    const submitNewPost = () => {
+        const content = newPostContent.trim();
+        if (!content || !newPostCategory) return;
+
+        const nowId = `p_${Date.now()}`;
+        const cats = newPostCats.map((name, idx) => ({
+            id: `${nowId}_cat_${idx}`,
+            name,
+            isMine: true,
+        }));
+
+        const next: CommunityPost = {
+            id: nowId,
+            user: 'You',
+            // Keep consistent with existing mock data (remote avatar). We can wire this to Supabase user metadata later.
+            avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+            content,
+            time: 'now',
+            likes: 0,
+            comments: 0,
+            likedByMe: false,
+            commentThread: [],
+            image: newPostImageUrl.trim() || undefined,
+            category: newPostCategory,
+            cats: cats.length ? cats : undefined,
+            isUrgent: newPostUrgent,
+            isTnr: newPostTnr,
+        };
+
+        setPosts((prev) => [next, ...prev]);
+        setNewPostOpen(false);
+    };
+
+    const toggleLike = (id: string) => {
         setPosts((prev) =>
-            prev.map((post) =>
-                post.id === id ? { ...post, resolved: !post.resolved } : post
-            )
+            prev.map((post) => {
+                if (post.id !== id) return post;
+                const liked = !post.likedByMe;
+                return {
+                    ...post,
+                    likedByMe: liked,
+                    likes: Math.max(0, (post.likes ?? 0) + (liked ? 1 : -1)),
+                };
+            })
         );
     };
 
+    const openComments = (id: string) => {
+        setCommentDraft('');
+        setCommentingPostId(id);
+    };
+
+    const closeComments = () => {
+        setCommentDraft('');
+        setCommentingPostId(null);
+    };
+
+    const commentingPost = useMemo(
+        () => posts.find((p) => p.id === commentingPostId) ?? null,
+        [commentingPostId, posts]
+    );
+
+    const addComment = () => {
+        const text = commentDraft.trim();
+        if (!commentingPostId || !text) return;
+        setPosts((prev) =>
+            prev.map((post) => {
+                if (post.id !== commentingPostId) return post;
+                const nextThread = post.commentThread ? [...post.commentThread] : [];
+                nextThread.push({
+                    id: `c_${Date.now()}`,
+                    user: 'You',
+                    content: text,
+                    time: 'now',
+                });
+                return {
+                    ...post,
+                    commentThread: nextThread,
+                    comments: (post.comments ?? 0) + 1,
+                };
+            })
+        );
+        setCommentDraft('');
+    };
+
     const renderItem = ({ item }: { item: CommunityPost }) => {
-        const urgentTint = item.isUrgent && !item.resolved;
-        const resolved = item.resolved;
+        const urgentTint = !!item.isUrgent;
+        const categoryStyle = getCategoryStyle(item.category);
         return (
-            <GlassView style={[styles.postCard, resolved && styles.resolvedCard]} intensity={isDark ? 30 : 0}>
+            <GlassView style={styles.postCard} intensity={isDark ? 30 : 0}>
                 <View
                     style={[
                         styles.cardInner,
@@ -147,7 +295,6 @@ export default function CommunityScreen() {
                                     ? 'transparent'
                                     : '#FFFFFF',
                         },
-                        resolved && styles.resolvedInner,
                     ]}
                 >
                     <View style={styles.header}>
@@ -157,20 +304,18 @@ export default function CommunityScreen() {
                             <Text style={[styles.time, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.time}</Text>
                         </View>
                         <View style={styles.headerBadges}>
-                            {item.isUrgent && !item.resolved && (
-                                <View style={styles.urgentBadge}>
-                                    <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor="#FF6B6B" />
-                                    <Text style={styles.urgentBadgeText}>Urgent</Text>
+                            {item.isUrgent && (
+                                <View style={[styles.categoryChip, { backgroundColor: Colors.primary.yellow, borderColor: 'rgba(255,255,255,0.22)' }]}>
+                                    <Text style={[styles.categoryText, { color: '#FFFFFF' }]}>Urgent</Text>
                                 </View>
                             )}
-                            {item.resolved && (
-                                <View style={styles.resolvedBadge}>
-                                    <SymbolView name="checkmark.seal.fill" size={14} tintColor={Colors.primary.green} />
-                                    <Text style={styles.resolvedBadgeText}>Resolved</Text>
+                            {item.isTnr && (
+                                <View style={[styles.categoryChip, { backgroundColor: '#8B5CF6', borderColor: 'rgba(255,255,255,0.22)' }]}>
+                                    <Text style={[styles.categoryText, { color: '#FFFFFF' }]}>TNR</Text>
                                 </View>
                             )}
-                            <View style={styles.categoryChip}>
-                                <Text style={styles.categoryText}>{item.category}</Text>
+                            <View style={[styles.categoryChip, { backgroundColor: categoryStyle.bg, borderColor: categoryStyle.border }]}>
+                                <Text style={[styles.categoryText, { color: categoryStyle.text }]}>{item.category}</Text>
                             </View>
                         </View>
                     </View>
@@ -179,7 +324,6 @@ export default function CommunityScreen() {
                         style={[
                             styles.content,
                             { color: isDark ? Colors.glass.text : Colors.light.text },
-                            resolved && styles.textMuted,
                         ]}
                     >
                         {item.content}
@@ -189,8 +333,8 @@ export default function CommunityScreen() {
                         <View style={styles.catRow}>
                             {item.cats.map((cat) => (
                                 <Link key={cat.id} href={`/cat/${cat.id}`} asChild>
-                                    <Pressable style={[styles.catPill, cat.isMine && styles.catPillMine]}>
-                                        <Text style={styles.catPillText}>{cat.name}</Text>
+                                    <Pressable style={[styles.catPill, urgentTint && styles.catPillUrgent, cat.isMine && styles.catPillMine]}>
+                                        <Text style={[styles.catPillText, urgentTint && styles.catPillTextUrgent]}>{cat.name}</Text>
                                     </Pressable>
                                 </Link>
                             ))}
@@ -203,21 +347,18 @@ export default function CommunityScreen() {
 
                     <View style={styles.footer}>
                         <View style={styles.action}>
-                            <GlassButton icon="heart" style={styles.actionBtn} />
+                            <GlassButton
+                                icon={item.likedByMe ? 'heart.fill' : 'heart'}
+                                style={styles.actionBtn}
+                                iconColor={item.likedByMe ? '#FF3B30' : undefined}
+                                onPress={() => toggleLike(item.id)}
+                            />
                             <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.likes}</Text>
                         </View>
                         <View style={styles.action}>
-                            <GlassButton icon="bubble.left" style={styles.actionBtn} />
+                            <GlassButton icon="bubble.left" style={styles.actionBtn} onPress={() => openComments(item.id)} />
                             <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.comments}</Text>
                         </View>
-                        {item.canResolve && (
-                            <GlassButton
-                                title={item.resolved ? 'Reopen' : 'Mark Resolved'}
-                                icon={item.resolved ? 'arrow.uturn.left' : 'checkmark.circle'}
-                                style={styles.resolveButton}
-                                onPress={() => toggleResolved(item.id)}
-                            />
-                        )}
                     </View>
                 </View>
             </GlassView>
@@ -239,6 +380,16 @@ export default function CommunityScreen() {
                         </Pressable>
                     );
                 })}
+
+                <Pressable
+                    onPress={openNewPost}
+                    style={({ pressed }) => [styles.addPostChip, pressed && { opacity: 0.9 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create new post"
+                >
+                    <SymbolView name="plus" size={14} tintColor={Colors.glass.text} />
+                    <Text style={styles.addPostChipText}>Post</Text>
+                </Pressable>
             </View>
             <FlatList
                 data={filteredPosts}
@@ -249,6 +400,247 @@ export default function CommunityScreen() {
                     { paddingBottom: 100 }
                 ]}
             />
+
+            <Modal
+                visible={newPostOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={closeNewPost}
+            >
+                <Pressable style={styles.modalBackdrop} onPress={closeNewPost} />
+                <View style={[styles.modalSheet, { paddingBottom: Math.max(20, insets.bottom + 16) }]}>
+                    <View
+                        style={[
+                            styles.newPostCard,
+                            {
+                                backgroundColor: isDark ? '#171717' : '#FFFFFF',
+                                borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
+                            },
+                        ]}
+                    >
+                        <View style={styles.newPostHeader}>
+                            <Pressable onPress={closeNewPost} style={styles.modalClose}>
+                                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>Cancel</Text>
+                            </Pressable>
+                            <Text style={[styles.modalTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>New Post</Text>
+                            <Pressable
+                                onPress={submitNewPost}
+                                disabled={!newPostContent.trim() || !newPostCategory}
+                                style={({ pressed }) => [
+                                    styles.newPostSubmit,
+                                    (!newPostContent.trim() || !newPostCategory) && { opacity: 0.4 },
+                                    pressed && { opacity: 0.85 },
+                                ]}
+                            >
+                                <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Post</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.newPostBody}>
+                            <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                Badges
+                            </Text>
+                            <View style={styles.newPostBadgesRow}>
+                                <View style={styles.newPostToggleRow}>
+                                    <Pressable
+                                        onPress={() => setNewPostUrgent((v) => !v)}
+                                        style={({ pressed }) => [
+                                            styles.newPostBadgeChip,
+                                            { backgroundColor: Colors.primary.yellow },
+                                            { borderColor: newPostUrgent ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
+                                            pressed && { opacity: 0.9 },
+                                        ]}
+                                    >
+                                        <Text style={styles.newPostBadgeText}>Urgent</Text>
+                                    </Pressable>
+
+                                    <Pressable
+                                        onPress={() => setNewPostTnr((v) => !v)}
+                                        style={({ pressed }) => [
+                                            styles.newPostBadgeChip,
+                                            { backgroundColor: '#8B5CF6' },
+                                            { borderColor: newPostTnr ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
+                                            pressed && { opacity: 0.9 },
+                                        ]}
+                                    >
+                                        <Text style={styles.newPostBadgeText}>TNR</Text>
+                                    </Pressable>
+                                </View>
+
+                                <View style={styles.newPostCategoryRow}>
+                                    {POST_CATEGORIES.map((cat) => {
+                                        const s = getCategoryStyle(cat);
+                                        const selected = cat === newPostCategory;
+                                        return (
+                                            <Pressable
+                                                key={cat}
+                                                onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
+                                                style={({ pressed }) => [
+                                                    styles.newPostBadgeChip,
+                                                    { backgroundColor: s.bg, borderColor: selected ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
+                                                    pressed && { opacity: 0.9 },
+                                                ]}
+                                            >
+                                                <Text style={styles.newPostBadgeText}>{cat}</Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+
+                            <TextInput
+                                value={newPostContent}
+                                onChangeText={setNewPostContent}
+                                placeholder="What’s happening?"
+                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
+                                multiline
+                                style={[
+                                    styles.newPostContentInput,
+                                    {
+                                        color: isDark ? Colors.glass.text : Colors.light.text,
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                                    },
+                                ]}
+                            />
+
+                            <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                Cats (optional)
+                            </Text>
+                            <View style={styles.newPostCatsWrap}>
+                                {newPostCats.map((name) => (
+                                    <Pressable
+                                        key={name}
+                                        onPress={() => removeCatTag(name)}
+                                        style={({ pressed }) => [styles.catPill, pressed && { opacity: 0.85 }]}
+                                    >
+                                        <Text style={styles.catPillText}>{name} ✕</Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                            <View style={styles.newPostCatInputRow}>
+                                <TextInput
+                                    value={newPostCatDraft}
+                                    onChangeText={setNewPostCatDraft}
+                                    placeholder="Add a cat name"
+                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
+                                    style={[
+                                        styles.newPostSmallInput,
+                                        {
+                                            color: isDark ? Colors.glass.text : Colors.light.text,
+                                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                                            borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                                        },
+                                    ]}
+                                    returnKeyType="done"
+                                    onSubmitEditing={addCatTag}
+                                />
+                                <Pressable
+                                    onPress={addCatTag}
+                                    disabled={!newPostCatDraft.trim()}
+                                    style={({ pressed }) => [
+                                        styles.newPostAddBtn,
+                                        !newPostCatDraft.trim() && { opacity: 0.4 },
+                                        pressed && { opacity: 0.85 },
+                                    ]}
+                                >
+                                    <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Add</Text>
+                                </Pressable>
+                            </View>
+
+                            
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={!!commentingPostId}
+                transparent
+                animationType="slide"
+                onRequestClose={closeComments}
+            >
+                <Pressable style={styles.modalBackdrop} onPress={closeComments} />
+                <View style={[styles.modalSheet, { paddingBottom: Math.max(20, insets.bottom + 16) }]}>
+                    <View
+                        style={[
+                            styles.modalCard,
+                            {
+                                // Opaque card for legibility (no glass / blur).
+                                backgroundColor: isDark ? '#171717' : '#FFFFFF',
+                                borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
+                            },
+                        ]}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                Comments
+                            </Text>
+                            <Pressable onPress={closeComments} style={styles.modalClose}>
+                                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>Done</Text>
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.modalBody}>
+                            <Text style={[styles.modalPostUser, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                {commentingPost?.user}
+                            </Text>
+                            <Text style={[styles.modalPostContent, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                {commentingPost?.content}
+                            </Text>
+
+                            <View style={styles.thread}>
+                                {(commentingPost?.commentThread ?? []).map((c) => (
+                                    <View key={c.id} style={styles.commentRow}>
+                                        <Text style={[styles.commentUser, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{c.user}</Text>
+                                        <Text style={[styles.commentText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                            {c.content}
+                                        </Text>
+                                        <Text style={[styles.commentTime, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                            {c.time}
+                                        </Text>
+                                    </View>
+                                ))}
+                                {(commentingPost?.commentThread?.length ?? 0) === 0 && (
+                                    <Text style={[styles.emptyThread, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                        Be the first to comment.
+                                    </Text>
+                                )}
+                            </View>
+                        </View>
+
+                        <View style={[styles.composer, { borderTopColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' }]}>
+                            <TextInput
+                                value={commentDraft}
+                                onChangeText={setCommentDraft}
+                                placeholder="Add a comment…"
+                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
+                                style={[
+                                    styles.composerInput,
+                                    {
+                                        color: isDark ? Colors.glass.text : Colors.light.text,
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                                    },
+                                ]}
+                                returnKeyType="send"
+                                onSubmitEditing={addComment}
+                            />
+                            <Pressable
+                                onPress={addComment}
+                                disabled={!commentDraft.trim()}
+                                style={({ pressed }) => [
+                                    styles.sendBtn,
+                                    !commentDraft.trim() && { opacity: 0.4 },
+                                    pressed && { opacity: 0.85 },
+                                ]}
+                            >
+                                <Text style={{ color: Colors.primary.blue, fontWeight: '700' }}>Post</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -284,20 +676,30 @@ const styles = StyleSheet.create({
     filterChipTextActive: {
         color: '#0C1B0C',
     },
+    addPostChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: '#3F8FF7',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.22)',
+        marginLeft: 'auto',
+    },
+    addPostChipText: {
+        color: Colors.glass.text,
+        fontWeight: '800',
+    },
     postCard: {
         marginBottom: 20,
         borderRadius: 24,
         overflow: 'hidden',
     },
-    resolvedCard: {
-        opacity: 0.9,
-    },
     cardInner: {
         borderRadius: 24,
         padding: 16,
-    },
-    resolvedInner: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
     },
     header: {
         flexDirection: 'row',
@@ -330,10 +732,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
     },
     categoryText: {
-        color: Colors.glass.text,
         fontSize: 12,
         fontWeight: '600',
     },
@@ -341,9 +742,6 @@ const styles = StyleSheet.create({
         fontSize: 15,
         lineHeight: 22,
         marginBottom: 12,
-    },
-    textMuted: {
-        color: 'rgba(255,255,255,0.7)',
     },
     catRow: {
         flexDirection: 'row',
@@ -355,7 +753,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 6,
         borderRadius: 999,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(0,0,0,0.18)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.14)',
+    },
+    catPillUrgent: {
+        backgroundColor: 'rgba(0,0,0,0.22)',
+        borderColor: 'rgba(255,255,255,0.18)',
     },
     catPillMine: {
         borderWidth: 1,
@@ -365,6 +769,9 @@ const styles = StyleSheet.create({
         color: Colors.glass.text,
         fontWeight: '600',
         fontSize: 12,
+    },
+    catPillTextUrgent: {
+        color: '#FFFFFF',
     },
     postImage: {
         width: '100%',
@@ -396,30 +803,187 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 12,
-        backgroundColor: 'rgba(255,107,107,0.2)',
+        backgroundColor: '#FF6B6B',
     },
     urgentBadgeText: {
-        color: '#FF6B6B',
+        color: '#FFFFFF',
         fontSize: 11,
         fontWeight: '700',
     },
-    resolvedBadge: {
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        padding: 16,
+    },
+    modalCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+    },
+    newPostCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 1,
+    },
+    newPostHeader: {
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 10,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        backgroundColor: 'rgba(103,206,103,0.15)',
+        justifyContent: 'space-between',
     },
-    resolvedBadgeText: {
-        color: Colors.primary.green,
-        fontSize: 11,
+    newPostSubmit: {
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    newPostBody: {
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+        gap: 10,
+    },
+    newPostLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 6,
+    },
+    newPostBadgesRow: {
+        gap: 10,
+    },
+    newPostToggleRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    newPostBadgeChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        height: 34,
+        minWidth: 132,
+        paddingHorizontal: 14,
+        borderRadius: 999,
+        borderWidth: 1.5,
+    },
+    newPostBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    newPostCategoryRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    newPostContentInput: {
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 14,
+        minHeight: 96,
+        textAlignVertical: 'top',
+    },
+    newPostCatsWrap: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    newPostCatInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    newPostSmallInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 14,
+    },
+    newPostAddBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    modalHeader: {
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    modalTitle: {
+        fontSize: 16,
         fontWeight: '700',
     },
-    resolveButton: {
-        marginLeft: 'auto',
-        height: 34,
+    modalClose: {
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+    },
+    modalBody: {
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+    },
+    modalPostUser: {
+        fontSize: 13,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+    modalPostContent: {
+        fontSize: 13,
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    thread: {
+        gap: 10,
+        paddingBottom: 6,
+    },
+    commentRow: {
+        gap: 2,
+    },
+    commentUser: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    commentText: {
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    commentTime: {
+        fontSize: 11,
+    },
+    emptyThread: {
+        fontSize: 13,
+        paddingVertical: 8,
+    },
+    composer: {
         paddingHorizontal: 12,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    composerInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 14,
+    },
+    sendBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
 });
