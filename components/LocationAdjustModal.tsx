@@ -1,9 +1,9 @@
 import { Colors } from '@/constants/Colors';
-import { GlassButton } from './ui/GlassButton';
-import { GlassView } from './ui/GlassView';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import { GlassButton } from './ui/GlassButton';
+import { GlassView } from './ui/GlassView';
 
 type Coordinate = {
     latitude: number;
@@ -59,6 +59,7 @@ export function LocationAdjustModal({ visible, coordinate, onClose, onSave }: Lo
                         style={styles.map}
                         initialRegion={region}
                         region={region}
+                        showsPointsOfInterest={false}
                         onRegionChangeComplete={(updated) => {
                             setDraftCoordinate({ latitude: updated.latitude, longitude: updated.longitude });
                         }}

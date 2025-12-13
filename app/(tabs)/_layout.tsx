@@ -1,50 +1,39 @@
-import { GlassTabBar } from '@/components/ui/GlassTabBar';
-import { Colors } from '@/constants/Colors';
-import { useTheme } from '@/context/ThemeContext';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 
 export default function TabLayout() {
-  const { isDark } = useTheme();
+    return (
+        <NativeTabs>
+            <NativeTabs.Trigger name="index">
+                <Icon
+                    sf={{ default: 'map', selected: 'map.fill' }}
+                    drawable="ic_menu_mapmode"
+                />
+                <Label>Map</Label>
+            </NativeTabs.Trigger>
 
-  return (
-    <Tabs
-      tabBar={(props) => <GlassTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background },
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Map',
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'Discover',
-        }}
-      />
-      <Tabs.Screen
-        name="report"
-        options={{
-          title: 'Add Cat',
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: 'Community',
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-        }}
-      />
-    </Tabs>
-  );
+            <NativeTabs.Trigger name="community">
+                <Icon
+                    sf={{ default: 'person.2', selected: 'person.2.fill' }}
+                    drawable="ic_menu_allfriends"
+                />
+                <Label>Community</Label>
+            </NativeTabs.Trigger>
+
+            <NativeTabs.Trigger name="clips">
+                <Icon
+                    sf={{ default: 'video', selected: 'video.fill' }}
+                    drawable="ic_menu_slideshow"
+                />
+                <Label>Clips</Label>
+            </NativeTabs.Trigger>
+
+            <NativeTabs.Trigger name="profile">
+                <Icon
+                    sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }}
+                    drawable="ic_menu_account"
+                />
+                <Label>Profile</Label>
+            </NativeTabs.Trigger>
+        </NativeTabs>
+    );
 }

@@ -2,15 +2,16 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
+import { getCats } from '@/lib/database';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useMemo, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type PostCategory = 'Sighting' | 'Medical Alert' | 'Question' | 'Success Story';
+type PostCategory = 'Sighting' | 'Medical Alert' | 'Question' | 'Success Story' | 'Urgent' | 'TNR';
 
-const POST_CATEGORIES: PostCategory[] = ['Sighting', 'Question', 'Medical Alert', 'Success Story'];
+const POST_CATEGORIES: PostCategory[] = ['Sighting', 'Question', 'Medical Alert', 'Success Story', 'Urgent', 'TNR'];
 
 type Comment = {
     id: string;
@@ -120,7 +121,6 @@ const POSTS: CommunityPost[] = [
 const FILTERS = [
     { id: 'all', label: 'All' },
     { id: 'urgent', label: 'Urgent' },
-    { id: 'mine', label: 'My Cats' },
     { id: 'question', label: 'Questions' },
 ] as const;
 
@@ -135,9 +135,8 @@ export default function CommunityScreen() {
     const [commentDraft, setCommentDraft] = useState('');
 
     const [newPostOpen, setNewPostOpen] = useState(false);
-    const [newPostCategory, setNewPostCategory] = useState<PostCategory | null>('Sighting');
-    const [newPostUrgent, setNewPostUrgent] = useState(false);
-    const [newPostTnr, setNewPostTnr] = useState(false);
+    const [newPostCategory, setNewPostCategory] = useState<PostCategory | null>(null);
+    const [catSuggestions, setCatSuggestions] = useState<{ id: string; name: string }[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
     const [newPostImageUrl, setNewPostImageUrl] = useState('');
     const [newPostCats, setNewPostCats] = useState<string[]>([]);
@@ -146,9 +145,7 @@ export default function CommunityScreen() {
     const filteredPosts = useMemo(() => {
         switch (activeFilter) {
             case 'urgent':
-                return posts.filter((post) => post.isUrgent);
-            case 'mine':
-                return posts.filter((post) => post.cats?.some((cat) => cat.isMine));
+                return posts.filter((post) => post.category === 'Urgent');
             case 'question':
                 return posts.filter((post) => post.category === 'Question');
             default:
@@ -164,19 +161,22 @@ export default function CommunityScreen() {
                 return { bg: '#FF6B6B', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
             case 'Success Story':
                 return { bg: '#67CE67', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+            case 'Urgent':
+                return { bg: Colors.primary.yellow, border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
+            case 'TNR':
+                return { bg: '#8B5CF6', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
             default:
                 return { bg: '#808080', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
         }
     };
 
     const openNewPost = () => {
-        setNewPostCategory('Sighting');
-        setNewPostUrgent(false);
-        setNewPostTnr(false);
+        setNewPostCategory(null);
         setNewPostContent('');
         setNewPostImageUrl('');
         setNewPostCats([]);
         setNewPostCatDraft('');
+        setCatSuggestions([]);
         setNewPostOpen(true);
     };
 
@@ -193,6 +193,37 @@ export default function CommunityScreen() {
 
     const removeCatTag = (name: string) => {
         setNewPostCats((prev) => prev.filter((x) => x !== name));
+    };
+
+    const searchCats = useCallback(async (query: string) => {
+        if (!query.trim()) {
+            setCatSuggestions([]);
+            return;
+        }
+        try {
+            const allCats = await getCats();
+            const filtered = allCats
+                .filter((cat: any) =>
+                    cat.name?.toLowerCase().includes(query.toLowerCase()) &&
+                    !newPostCats.includes(cat.name)
+                )
+                .slice(0, 5)
+                .map((cat: any) => ({ id: String(cat.id), name: cat.name }));
+            setCatSuggestions(filtered);
+        } catch {
+            setCatSuggestions([]);
+        }
+    }, [newPostCats]);
+
+    const handleCatDraftChange = (text: string) => {
+        setNewPostCatDraft(text);
+        searchCats(text);
+    };
+
+    const selectCatSuggestion = (name: string) => {
+        setNewPostCats((prev) => (prev.includes(name) ? prev : [...prev, name]));
+        setNewPostCatDraft('');
+        setCatSuggestions([]);
     };
 
     const submitNewPost = () => {
@@ -220,8 +251,6 @@ export default function CommunityScreen() {
             image: newPostImageUrl.trim() || undefined,
             category: newPostCategory,
             cats: cats.length ? cats : undefined,
-            isUrgent: newPostUrgent,
-            isTnr: newPostTnr,
         };
 
         setPosts((prev) => [next, ...prev]);
@@ -281,42 +310,20 @@ export default function CommunityScreen() {
     };
 
     const renderItem = ({ item }: { item: CommunityPost }) => {
-        const urgentTint = !!item.isUrgent;
         const categoryStyle = getCategoryStyle(item.category);
         return (
-            <GlassView style={styles.postCard} intensity={isDark ? 30 : 0}>
-                <View
-                    style={[
-                        styles.cardInner,
-                        {
-                            backgroundColor: urgentTint
-                                ? 'rgba(255,107,107,0.15)'
-                                : isDark
-                                    ? 'transparent'
-                                    : '#FFFFFF',
-                        },
-                    ]}
-                >
+            <GlassView
+                style={styles.postCard}
+                intensity={80}
+                glassEffectStyle="clear"
+                tintColor={isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.94)'}
+            >
+                <View style={styles.cardInner}>
                     <View style={styles.header}>
                         <Image source={{ uri: item.avatar }} style={styles.avatar} />
                         <View style={styles.headerText}>
                             <Text style={[styles.username, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{item.user}</Text>
                             <Text style={[styles.time, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.time}</Text>
-                        </View>
-                        <View style={styles.headerBadges}>
-                            {item.isUrgent && (
-                                <View style={[styles.categoryChip, { backgroundColor: Colors.primary.yellow, borderColor: 'rgba(255,255,255,0.22)' }]}>
-                                    <Text style={[styles.categoryText, { color: '#FFFFFF' }]}>Urgent</Text>
-                                </View>
-                            )}
-                            {item.isTnr && (
-                                <View style={[styles.categoryChip, { backgroundColor: '#8B5CF6', borderColor: 'rgba(255,255,255,0.22)' }]}>
-                                    <Text style={[styles.categoryText, { color: '#FFFFFF' }]}>TNR</Text>
-                                </View>
-                            )}
-                            <View style={[styles.categoryChip, { backgroundColor: categoryStyle.bg, borderColor: categoryStyle.border }]}>
-                                <Text style={[styles.categoryText, { color: categoryStyle.text }]}>{item.category}</Text>
-                            </View>
                         </View>
                     </View>
 
@@ -333,8 +340,8 @@ export default function CommunityScreen() {
                         <View style={styles.catRow}>
                             {item.cats.map((cat) => (
                                 <Link key={cat.id} href={`/cat/${cat.id}`} asChild>
-                                    <Pressable style={[styles.catPill, urgentTint && styles.catPillUrgent, cat.isMine && styles.catPillMine]}>
-                                        <Text style={[styles.catPillText, urgentTint && styles.catPillTextUrgent]}>{cat.name}</Text>
+                                    <Pressable style={[styles.catPill, cat.isMine && styles.catPillMine]}>
+                                        <Text style={styles.catPillText}>{cat.name}</Text>
                                     </Pressable>
                                 </Link>
                             ))}
@@ -346,18 +353,23 @@ export default function CommunityScreen() {
                     )}
 
                     <View style={styles.footer}>
-                        <View style={styles.action}>
-                            <GlassButton
-                                icon={item.likedByMe ? 'heart.fill' : 'heart'}
-                                style={styles.actionBtn}
-                                iconColor={item.likedByMe ? '#FF3B30' : undefined}
-                                onPress={() => toggleLike(item.id)}
-                            />
-                            <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.likes}</Text>
+                        <View style={styles.footerLeft}>
+                            <View style={styles.action}>
+                                <GlassButton
+                                    icon={item.likedByMe ? 'heart.fill' : 'heart'}
+                                    style={styles.actionBtn}
+                                    iconColor={item.likedByMe ? '#FF3B30' : undefined}
+                                    onPress={() => toggleLike(item.id)}
+                                />
+                                <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.likes}</Text>
+                            </View>
+                            <View style={styles.action}>
+                                <GlassButton icon="bubble.left" style={styles.actionBtn} onPress={() => openComments(item.id)} />
+                                <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.comments}</Text>
+                            </View>
                         </View>
-                        <View style={styles.action}>
-                            <GlassButton icon="bubble.left" style={styles.actionBtn} onPress={() => openComments(item.id)} />
-                            <Text style={[styles.actionText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{item.comments}</Text>
+                        <View style={[styles.categoryChip, { backgroundColor: categoryStyle.bg, borderColor: categoryStyle.border }]}>
+                            <Text style={[styles.categoryText, { color: categoryStyle.text }]}>{item.category}</Text>
                         </View>
                     </View>
                 </View>
@@ -366,40 +378,61 @@ export default function CommunityScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
-            <View style={[styles.filterRow, { paddingTop: insets.top + 12 }]}>
-                {FILTERS.map((filter) => {
-                    const active = filter.id === activeFilter;
-                    return (
-                        <Pressable
-                            key={filter.id}
-                            onPress={() => setActiveFilter(filter.id)}
-                            style={[styles.filterChip, active && styles.filterChipActive]}
-                        >
-                            <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>{filter.label}</Text>
-                        </Pressable>
-                    );
-                })}
-
-                <Pressable
-                    onPress={openNewPost}
-                    style={({ pressed }) => [styles.addPostChip, pressed && { opacity: 0.9 }]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Create new post"
-                >
-                    <SymbolView name="plus" size={14} tintColor={Colors.glass.text} />
-                    <Text style={styles.addPostChipText}>Post</Text>
-                </Pressable>
-            </View>
+        <ImageBackground
+            source={require('@/assets/images/Motive.png')}
+            style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : '#FFFFFF' }]}
+            imageStyle={styles.backgroundImage}
+            resizeMode="contain"
+        >
             <FlatList
                 data={filteredPosts}
                 renderItem={renderItem}
                 keyExtractor={item => item.id}
                 contentContainerStyle={[
                     styles.listContent,
-                    { paddingBottom: 100 }
+                    { paddingTop: insets.top + 60, paddingBottom: 100 }
                 ]}
             />
+            <View style={[styles.filterRow, { top: insets.top + 12 }]}>
+                <View style={[styles.filterPillContainer, { backgroundColor: isDark ? 'rgba(60,60,60,0.75)' : 'rgba(255,255,255,0.75)' }]}>
+                    <View style={styles.filterChips}>
+                        {FILTERS.map((filter) => {
+                            const active = filter.id === activeFilter;
+                            return (
+                            <Pressable
+                                key={filter.id}
+                                onPress={() => setActiveFilter(filter.id)}
+                                style={[
+                                    styles.filterChip,
+                                    isDark && !active && styles.filterChipDark,
+                                    active && styles.filterChipActive,
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.filterChipText,
+                                        isDark && !active && styles.filterChipTextDark,
+                                        active && styles.filterChipTextActive,
+                                    ]}
+                                >
+                                    {filter.label}
+                                </Text>
+                            </Pressable>
+                        );
+                    })}
+                    </View>
+                    <View style={[styles.filterSeparator, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }]} />
+                    <Pressable
+                        onPress={openNewPost}
+                        style={({ pressed }) => [styles.addPostChip, pressed && { opacity: 0.9 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Create new post"
+                    >
+                        <SymbolView name="plus" size={14} tintColor={Colors.glass.text} />
+                        <Text style={styles.addPostChipText}>Post</Text>
+                    </Pressable>
+                </View>
+            </View>
 
             <Modal
                 visible={newPostOpen}
@@ -438,54 +471,26 @@ export default function CommunityScreen() {
 
                         <View style={styles.newPostBody}>
                             <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                Badges
+                                Badge (choose one)
                             </Text>
-                            <View style={styles.newPostBadgesRow}>
-                                <View style={styles.newPostToggleRow}>
-                                    <Pressable
-                                        onPress={() => setNewPostUrgent((v) => !v)}
-                                        style={({ pressed }) => [
-                                            styles.newPostBadgeChip,
-                                            { backgroundColor: Colors.primary.yellow },
-                                            { borderColor: newPostUrgent ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
-                                            pressed && { opacity: 0.9 },
-                                        ]}
-                                    >
-                                        <Text style={styles.newPostBadgeText}>Urgent</Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        onPress={() => setNewPostTnr((v) => !v)}
-                                        style={({ pressed }) => [
-                                            styles.newPostBadgeChip,
-                                            { backgroundColor: '#8B5CF6' },
-                                            { borderColor: newPostTnr ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
-                                            pressed && { opacity: 0.9 },
-                                        ]}
-                                    >
-                                        <Text style={styles.newPostBadgeText}>TNR</Text>
-                                    </Pressable>
-                                </View>
-
-                                <View style={styles.newPostCategoryRow}>
-                                    {POST_CATEGORIES.map((cat) => {
-                                        const s = getCategoryStyle(cat);
-                                        const selected = cat === newPostCategory;
-                                        return (
-                                            <Pressable
-                                                key={cat}
-                                                onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
-                                                style={({ pressed }) => [
-                                                    styles.newPostBadgeChip,
-                                                    { backgroundColor: s.bg, borderColor: selected ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
-                                                    pressed && { opacity: 0.9 },
-                                                ]}
-                                            >
-                                                <Text style={styles.newPostBadgeText}>{cat}</Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
+                            <View style={styles.newPostCategoryRow}>
+                                {POST_CATEGORIES.map((cat) => {
+                                    const s = getCategoryStyle(cat);
+                                    const selected = cat === newPostCategory;
+                                    return (
+                                        <Pressable
+                                            key={cat}
+                                            onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
+                                            style={({ pressed }) => [
+                                                styles.newPostBadgeChip,
+                                                { backgroundColor: s.bg, borderColor: selected ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
+                                                pressed && { opacity: 0.9 },
+                                            ]}
+                                        >
+                                            <Text style={styles.newPostBadgeText}>{cat}</Text>
+                                        </Pressable>
+                                    );
+                                })}
                             </View>
 
                             <TextInput
@@ -521,8 +526,8 @@ export default function CommunityScreen() {
                             <View style={styles.newPostCatInputRow}>
                                 <TextInput
                                     value={newPostCatDraft}
-                                    onChangeText={setNewPostCatDraft}
-                                    placeholder="Add a cat name"
+                                    onChangeText={handleCatDraftChange}
+                                    placeholder="Search or add a cat name"
                                     placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
                                     style={[
                                         styles.newPostSmallInput,
@@ -547,6 +552,22 @@ export default function CommunityScreen() {
                                     <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Add</Text>
                                 </Pressable>
                             </View>
+                            {catSuggestions.length > 0 && (
+                                <View style={[styles.catSuggestions, { backgroundColor: isDark ? 'rgba(40,40,40,0.98)' : '#FFFFFF' }]}>
+                                    {catSuggestions.map((cat) => (
+                                        <Pressable
+                                            key={cat.id}
+                                            onPress={() => selectCatSuggestion(cat.name)}
+                                            style={({ pressed }) => [
+                                                styles.catSuggestionItem,
+                                                pressed && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                                            ]}
+                                        >
+                                            <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>{cat.name}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            )}
 
                             
                         </View>
@@ -641,40 +662,76 @@ export default function CommunityScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.primary.dark,
+    },
+    backgroundImage: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: '120%',
+        height: '80%',
+        transform: [{ translateX: '-50%' }, { translateY: '-40%' }],
+        opacity: 0.2,
     },
     listContent: {
         paddingHorizontal: 20,
     },
     filterRow: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        paddingHorizontal: 20,
-        paddingBottom: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    filterPillContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 24,
+        backdropFilter: 'blur(20px)',
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 2 },
+    },
+    filterChips: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    filterSeparator: {
+        width: 1,
+        height: 24,
+        marginHorizontal: 12,
     },
     filterChip: {
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(0,0,0,0.08)',
     },
     filterChipActive: {
         backgroundColor: Colors.primary.green,
     },
     filterChipText: {
-        color: Colors.glass.text,
+        color: 'rgba(0,0,0,0.6)',
         fontWeight: '600',
     },
     filterChipTextActive: {
         color: '#0C1B0C',
+    },
+    filterChipDark: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    filterChipTextDark: {
+        color: Colors.glass.text,
     },
     addPostChip: {
         flexDirection: 'row',
@@ -684,9 +741,6 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
         borderRadius: 16,
         backgroundColor: '#3F8FF7',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.22)',
-        marginLeft: 'auto',
     },
     addPostChipText: {
         color: Colors.glass.text,
@@ -757,10 +811,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.14)',
     },
-    catPillUrgent: {
-        backgroundColor: 'rgba(0,0,0,0.22)',
-        borderColor: 'rgba(255,255,255,0.18)',
-    },
     catPillMine: {
         borderWidth: 1,
         borderColor: Colors.primary.green,
@@ -770,9 +820,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         fontSize: 12,
     },
-    catPillTextUrgent: {
-        color: '#FFFFFF',
-    },
     postImage: {
         width: '100%',
         height: 200,
@@ -780,6 +827,11 @@ const styles = StyleSheet.create({
         marginBottom: 12,
     },
     footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    footerLeft: {
         flexDirection: 'row',
         gap: 20,
         alignItems: 'center',
@@ -912,6 +964,22 @@ const styles = StyleSheet.create({
     newPostAddBtn: {
         paddingHorizontal: 10,
         paddingVertical: 8,
+    },
+    catSuggestions: {
+        borderRadius: 12,
+        marginTop: 4,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+    },
+    catSuggestionItem: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(128,128,128,0.2)',
     },
     modalHeader: {
         paddingHorizontal: 16,

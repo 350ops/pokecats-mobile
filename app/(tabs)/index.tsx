@@ -6,8 +6,8 @@ import { addFeeding, getCats, updateCat } from '@/lib/database';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, FlatList, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, FlatList, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,12 +32,6 @@ type MapCat = {
     tnrStatus?: boolean;
 };
 
-type FilterDefinition = {
-    id: string;
-    label: string;
-    predicate: (cat: MapCat) => boolean;
-};
-
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
 const CURRENT_USER_ID = 42;
 const CARD_HORIZONTAL_MARGIN = 20;
@@ -58,34 +52,6 @@ const INITIAL_REGION: Region = {
     longitudeDelta: 0.03,
 };
 
-const FILTERS: FilterDefinition[] = [
-    {
-        id: 'needs-help',
-        label: 'Needs Help',
-        predicate: (cat) => (cat.status ?? '').toLowerCase() === 'needs help',
-    },
-    {
-        id: 'not-neutered',
-        label: 'Not Neutered',
-        predicate: (cat) => cat.tnrStatus === false,
-    },
-    {
-        id: 'recently-seen',
-        label: 'Recently Seen',
-        predicate: (cat) => isRecentlySeen(cat.lastSighted),
-    },
-    {
-        id: 'my-cats',
-        label: 'My Cats',
-        predicate: (cat) => isCatAssignedToUser(cat, CURRENT_USER_ID),
-    },
-    {
-        id: 'urgent',
-        label: 'Rescue Flags',
-        predicate: (cat) => Array.isArray(cat.rescueFlags) && cat.rescueFlags.length > 0,
-    },
-];
-
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<MapCat>);
 
 export default function MapScreen() {
@@ -93,7 +59,6 @@ export default function MapScreen() {
     const insets = useSafeAreaInsets();
     const [cats, setCats] = useState<MapCat[]>([]);
     const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
-    const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
     const [feedingCatId, setFeedingCatId] = useState<number | null>(null);
     const [statusUpdatingCatId, setStatusUpdatingCatId] = useState<number | null>(null);
     const mapRef = useRef<MapView | null>(null);
@@ -102,7 +67,6 @@ export default function MapScreen() {
     const scrollX = useRef(new Animated.Value(0)).current;
     const primaryTextColor = isDark ? Colors.glass.text : Colors.primary.dark;
     const secondaryTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-    const subduedTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.5)';
     const cardSurface = isDark ? Colors.glass.background : 'rgba(255,255,255,0.9)';
     const statSurface = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
 
@@ -129,18 +93,8 @@ export default function MapScreen() {
         }, [])
     );
 
-    const filteredCats = useMemo(() => {
-        if (!activeFilters.size) return cats;
-        return cats.filter((cat) => {
-            for (const filterId of activeFilters) {
-                const filterDef = FILTERS.find((f) => f.id === filterId);
-                if (filterDef && !filterDef.predicate(cat)) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    }, [cats, activeFilters]);
+    // All cats are shown (no filters)
+    const filteredCats = cats;
 
 
 
@@ -156,18 +110,6 @@ export default function MapScreen() {
     }, [filteredCats, selectedCatId]);
 
     const selectedCat = selectedCatId ? filteredCats.find((cat) => cat.id === selectedCatId) ?? null : null;
-
-    const toggleFilter = (filterId: string) => {
-        setActiveFilters((prev) => {
-            const next = new Set(prev);
-            if (next.has(filterId)) {
-                next.delete(filterId);
-            } else {
-                next.add(filterId);
-            }
-            return next;
-        });
-    };
 
     const getDisplayCoordinate = useCallback(
         (cat: MapCat) => {
@@ -223,16 +165,6 @@ export default function MapScreen() {
             </View>
         );
     }
-
-    const getFedSeverityColor = (dateValue?: string | Date | null, isDarkMode?: boolean) => {
-        if (!dateValue) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-        const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
-        if (!(date instanceof Date) || isNaN(date.getTime())) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-        const hours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
-        if (hours < 12) return isDarkMode ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-        if (hours < 18) return '#F4B63E';
-        return '#FF6B6B';
-    };
 
     const handleFeedCat = async (cat: MapCat) => {
         setFeedingCatId(cat.id);
@@ -333,7 +265,7 @@ export default function MapScreen() {
         }
     };
 
-    const catCountLabel = activeFilters.size ? `${filteredCats.length} cats match filters` : `${cats.length} cats nearby`;
+    const catCountLabel = `${cats.length} cats nearby`;
 
     const renderCarouselItem = ({ item, index }: { item: MapCat; index: number }) => {
         const inputRange = [
@@ -472,6 +404,7 @@ export default function MapScreen() {
                 ref={mapRef}
                 style={StyleSheet.absoluteFill}
                 initialRegion={INITIAL_REGION}
+                showsPointsOfInterest={false}
                 userInterfaceStyle={colorScheme ?? 'light'}
                 tintColor={Colors.primary.green}
             >
@@ -507,25 +440,30 @@ export default function MapScreen() {
                 })}
             </MapView>
 
-            <View style={[styles.filterBarWrapper, { top: insets.top + 12 }]}>
-                <GlassView style={styles.filterBar} intensity={70}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
-                        {FILTERS.map((filter) => (
-                            <MapFilterChip
-                                key={filter.id}
-                                label={filter.label}
-                                active={activeFilters.has(filter.id)}
-                                onPress={() => toggleFilter(filter.id)}
-                                textColor={primaryTextColor}
-                            />
-                        ))}
-                    </ScrollView>
+            <GlassView style={[styles.catCountPill, { top: insets.top + 12 }]} intensity={70}>
+                <Text style={[styles.catCountText, { color: primaryTextColor }]}>{catCountLabel}</Text>
+            </GlassView>
+
+            <View style={[styles.topRightButtons, { top: insets.top + 12 }]}>
+                <GlassView style={styles.topRightButton} intensity={70}>
+                    <Pressable
+                        onPress={() => router.push('/discover')}
+                        accessibilityLabel="Browse cats"
+                        style={styles.topRightButtonInner}
+                    >
+                        <SymbolView name="line.3.horizontal" size={22} tintColor={primaryTextColor} />
+                    </Pressable>
+                </GlassView>
+                <GlassView style={styles.topRightButton} intensity={70}>
+                    <Pressable
+                        onPress={() => router.push('/report')}
+                        accessibilityLabel="Add cat"
+                        style={styles.topRightButtonInner}
+                    >
+                        <SymbolView name="plus" size={24} tintColor={primaryTextColor} />
+                    </Pressable>
                 </GlassView>
             </View>
-
-            <GlassView style={styles.overlay} intensity={60}>
-                <Text style={[styles.overlayText, { color: primaryTextColor }]}>{catCountLabel}</Text>
-            </GlassView>
 
             {!filteredCats.length && (
                 <View style={styles.emptyState}>
@@ -594,15 +532,6 @@ const MapActionButton = ({
     </Pressable>
 );
 
-const MapFilterChip = ({ label, active, onPress, textColor }: { label: string; active: boolean; onPress: () => void; textColor: string }) => (
-    <Pressable
-        onPress={onPress}
-        style={[styles.filterChip, active && styles.filterChipActive]}
-    >
-        <Text style={[styles.filterChipText, { color: textColor }, active && styles.filterChipTextActive]}>{label}</Text>
-    </Pressable>
-);
-
 const StatRow = ({
     icon,
     label,
@@ -638,14 +567,6 @@ const getTimeAgo = (dateValue?: string | Date | null) => {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
     return `${days}d ago`;
-};
-
-const isRecentlySeen = (dateValue?: string | Date | null) => {
-    if (!dateValue) return false;
-    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
-    if (!(date instanceof Date) || isNaN(date.getTime())) return false;
-    const elapsedHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
-    return elapsedHours <= 6;
 };
 
 const isCatAssignedToUser = (cat: MapCat, userId: number) => {
@@ -700,43 +621,46 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.35,
         shadowRadius: 6,
     },
-    overlay: {
+    catCountPill: {
         position: 'absolute',
-        top: 70,
-        alignSelf: 'center',
+        left: 20,
         paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
+        paddingVertical: 12,
+        borderRadius: 24,
     },
-    overlayText: {
-        fontWeight: 'bold',
+    catCountText: {
+        fontWeight: '700',
+        fontSize: 15,
     },
-    filterBarWrapper: {
+    addCatButton: {
         position: 'absolute',
-        left: 0,
-        right: 0,
+        right: 20,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+    },
+    addCatButtonInner: {
+        flex: 1,
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    filterBar: {
-        borderRadius: 30,
-        paddingVertical: 4,
+    topRightButtons: {
+        position: 'absolute',
+        right: 20,
+        flexDirection: 'row',
+        gap: 10,
     },
-    filterChip: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+    topRightButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
     },
-    filterChipActive: {
-        backgroundColor: Colors.primary.green,
-    },
-    filterChipText: {
-        color: Colors.glass.text,
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    filterChipTextActive: {
-        color: '#0F0F0F',
+    topRightButtonInner: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     emptyState: {
         position: 'absolute',

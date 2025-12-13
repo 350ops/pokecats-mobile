@@ -13,6 +13,8 @@ export type QuickReportPayload = {
     rescueFlags?: string[];
     colorTag?: string | null;
     tnrStatus?: boolean;
+    status?: string;
+    lastFed?: string;
 };
 
 // We no longer use expo-sqlite directly for data, but could use it for offline caching if we wanted to get fancy.
@@ -24,7 +26,20 @@ export const initDatabase = async () => {
     console.log('Using Supabase backend');
 };
 
-export const addCat = async (name: string, description: string, image: string, latitude: number, longitude: number) => {
+export const addCat = async (
+    name: string,
+    description: string,
+    image: string,
+    latitude: number,
+    longitude: number,
+    options?: {
+        status?: string;
+        tnrStatus?: boolean;
+        colorProfile?: string[];
+        rescueFlags?: string[];
+        lastFed?: string;
+    }
+) => {
     const { error } = await supabase
         .from('cats')
         .insert({
@@ -33,9 +48,13 @@ export const addCat = async (name: string, description: string, image: string, l
             image,
             latitude,
             longitude,
-            status: 'Needs Help',
+            status: options?.status ?? 'Healthy',
             breed: 'Unknown',
-            last_sighted: new Date().toISOString()
+            last_sighted: new Date().toISOString(),
+            tnr_status: options?.tnrStatus ?? false,
+            color_profile: options?.colorProfile ?? [],
+            rescue_flags: options?.rescueFlags ?? [],
+            last_fed: options?.lastFed,
         });
 
     if (error) console.error('Error adding cat:', error);
@@ -307,10 +326,17 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
 
     await addCat(
         payload.draftName ?? 'Unknown cat',
-        payload.description ?? 'Quick sighting report',
+        payload.description ?? '',
         payload.photoUri ?? '',
         payload.latitude,
-        payload.longitude
+        payload.longitude,
+        {
+            status: payload.status ?? 'Healthy',
+            tnrStatus: payload.tnrStatus,
+            colorProfile: payload.colorTag ? [payload.colorTag] : [],
+            rescueFlags: payload.rescueFlags,
+            lastFed: payload.lastFed,
+        }
     );
     return null;
 };

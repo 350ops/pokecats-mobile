@@ -1,6 +1,5 @@
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { getCatStatusState } from '@/lib/cat_logic';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { GlassView } from './ui/GlassView';
 
@@ -35,17 +34,15 @@ type DistanceMeta = {
     text: string;
 };
 
-type BadgeMeta = {
-    id: string;
-    label: string;
-    background: string;
-    text: string;
-};
+const CheckmarkIcon = require('@/assets/images/Checkmark.png');
+const ExclamationIcon = require('@/assets/images/Exclamation.png');
+const ShieldIcon = require('@/assets/images/Shield.png');
 
 export function CatCard({ cat }: CatCardProps) {
     const { isDark } = useTheme();
     const distanceMeta = getDistanceMeta(cat);
-    const badges = getBadgeMeta(cat);
+    const needsHelp = (cat.status ?? '').toLowerCase() === 'needs help';
+    const isTnrd = cat.tnrStatus === true;
 
     return (
         <GlassView
@@ -60,12 +57,9 @@ export function CatCard({ cat }: CatCardProps) {
         >
             <View style={styles.imageWrapper}>
                 <Image source={{ uri: cat.image }} style={styles.image} />
-                <View style={styles.badgeColumn}>
-                    {badges.map((badge) => (
-                        <View key={badge.id} style={[styles.cornerBadge, { backgroundColor: badge.background }]}>
-                            <Text style={[styles.cornerBadgeText, { color: badge.text }]}>{badge.label}</Text>
-                        </View>
-                    ))}
+                <View style={styles.statusIcons}>
+                    <Image source={needsHelp ? ExclamationIcon : CheckmarkIcon} style={styles.statusIcon} />
+                    {isTnrd && <Image source={ShieldIcon} style={styles.statusIcon} />}
                 </View>
             </View>
 
@@ -88,11 +82,6 @@ export function CatCard({ cat }: CatCardProps) {
                     <Text style={[styles.meta, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
                         Seen {formatTimeAgo(cat.lastSighted)}
                     </Text>
-                    {typeof cat.timesFed === 'number' && (
-                        <Text style={[styles.metaStrong, { color: Colors.primary.green }]}>
-                            {cat.timesFed} feeds
-                        </Text>
-                    )}
                 </View>
             </View>
         </GlassView>
@@ -117,77 +106,19 @@ const getDistanceMeta = (cat: Cat & { distanceMeters?: number }): DistanceMeta =
 
     if (meters < 2000) {
         return {
-            label: 'Walkable',
+            label: 'Walk',
             value: formatMeters(meters),
-            background: 'rgba(255, 184, 69, 0.18)',
-            text: Colors.primary.yellow,
+            background: 'rgba(0, 143, 33, 0.66)',
+            text: Colors.glass.text,
         };
     }
 
     return {
-        label: 'Farther',
+        label: 'Far',
         value: formatMeters(meters),
-        background: 'rgba(255, 255, 255, 0.1)',
+        background: 'rgba(9, 0, 108, 0.7)',
         text: Colors.glass.text,
     };
-};
-
-const getBadgeMeta = (cat: Cat): BadgeMeta[] => {
-    const badges: BadgeMeta[] = [];
-
-    // Add Primary Status Badge (Healthy/Hungry/Needs Help)
-    const statusState = getCatStatusState(cat);
-    badges.push({
-        id: 'status',
-        label: statusState.statusText,
-        background: statusState.statusColor,
-        text: statusState.labelColor
-    });
-
-    if (cat.rescueFlags?.length) {
-        badges.push({
-            id: `flag-${cat.rescueFlags[0]}`,
-            label: formatFlagLabel(cat.rescueFlags[0]),
-            background: 'rgba(255, 107, 107, 0.95)',
-            text: '#360000',
-        });
-    }
-
-    if (cat.tnrStatus === true) {
-        badges.push({
-            id: 'tnr',
-            label: 'TNR’d',
-            background: 'rgba(103, 206, 103, 0.9)',
-            text: '#082A14',
-        });
-    } else if (cat.tnrStatus === false) {
-        badges.push({
-            id: 'intact',
-            label: 'Intact',
-            background: 'rgba(255, 184, 69, 0.95)',
-            text: '#3D2100',
-        });
-    }
-
-    if (cat.adoptionStatus === 'looking_for_home') {
-        badges.push({
-            id: 'looking-home',
-            label: 'Looking for Home',
-            background: 'rgba(151, 128, 255, 0.95)',
-            text: '#110035',
-        });
-    }
-
-    if (cat.isColonyCat) {
-        badges.push({
-            id: 'colony',
-            label: 'Colony Cat',
-            background: 'rgba(255, 255, 255, 0.25)',
-            text: Colors.glass.text,
-        });
-    }
-
-    return badges;
 };
 
 const parseDistanceFromString = (distance?: string) => {
@@ -218,29 +149,6 @@ const formatTimeAgo = (value?: string | Date | null) => {
     return `${days}d ago`;
 };
 
-const formatFlagLabel = (flag: string) => {
-    switch (flag) {
-        case 'injured':
-            return 'Injured';
-        case 'very-thin':
-            return 'Very Thin';
-        case 'kitten':
-            return 'Kitten';
-        case 'pregnant':
-            return 'Pregnant';
-        case 'dumped-pet':
-            return 'Dumped Pet';
-        case 'friendly':
-            return 'Friendly';
-        case 'scared':
-            return 'Scared';
-        case 'colony':
-            return 'Colony Cat';
-        default:
-            return flag.replace(/-/g, ' ');
-    }
-};
-
 const styles = StyleSheet.create({
     card: {
         marginBottom: 20,
@@ -257,20 +165,16 @@ const styles = StyleSheet.create({
         height: 200,
         backgroundColor: '#333',
     },
-    badgeColumn: {
+    statusIcons: {
         position: 'absolute',
-        top: 12,
-        left: 12,
+        top: 10,
+        right: 10,
+        flexDirection: 'row',
+        gap: 6,
     },
-    cornerBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 999,
-        marginBottom: 6,
-    },
-    cornerBadgeText: {
-        fontSize: 11,
-        fontWeight: '700',
+    statusIcon: {
+        width: 28,
+        height: 28,
     },
     content: {
         padding: 16,
@@ -281,22 +185,21 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     distancePill: {
-        paddingHorizontal: 8,
-        paddingVertical: 6,
-        borderRadius: 16,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
         flexDirection: 'row',
         alignItems: 'center',
     },
     distanceLabel: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '700',
         textTransform: 'uppercase',
-        marginBottom: 4,
     },
     distanceValue: {
-        fontSize: 13,
+        fontSize: 10,
         fontWeight: '600',
-        marginLeft: 6,
+        marginLeft: 4,
     },
     statusLabel: {
         fontSize: 12,
