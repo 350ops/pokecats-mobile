@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { uploadCatClip } from '@/lib/clipUpload';
-import { Camera, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,11 +15,11 @@ type Props = {
 const MAX_SECONDS = 20;
 
 export function ClipRecorder({ onUploaded }: Props) {
-    const cameraRef = useRef<Camera | null>(null);
+    const cameraRef = useRef<CameraView | null>(null);
     const { isDark } = useTheme();
     const insets = useSafeAreaInsets();
-    const [cameraPermission, requestCameraPermission] = Camera.useCameraPermissions();
-    const [micPermission, requestMicPermission] = Camera.useMicrophonePermissions();
+    const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+    const [micPermission, requestMicPermission] = useMicrophonePermissions();
     const [recording, setRecording] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -64,7 +64,6 @@ export function ClipRecorder({ onUploaded }: Props) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const result = await cam.recordAsync({
                 maxDuration: MAX_SECONDS,
-                quality: Camera.Constants.VideoQuality['720p'],
             });
             setRecording(false);
             if (!result?.uri) return;
@@ -102,11 +101,11 @@ export function ClipRecorder({ onUploaded }: Props) {
 
     return (
         <View style={styles.container}>
-            <Camera
-                ref={(ref) => (cameraRef.current = ref)}
+            <CameraView
+                ref={(ref) => { cameraRef.current = ref; }}
                 style={StyleSheet.absoluteFill}
-                type={CameraType.back}
-                ratio="16:9"
+                facing="back"
+                mode="video"
             />
 
             {!hasAllPermissions && (

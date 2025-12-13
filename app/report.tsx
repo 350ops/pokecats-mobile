@@ -1,5 +1,7 @@
 import { LocationAdjustModal } from '@/components/LocationAdjustModal';
 import { GlassButton } from '@/components/ui/GlassButton';
+import { GlassView } from '@/components/ui/GlassView';
+import { CAT_COLORS, CAT_PATTERNS, CatColor, CatPattern } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { submitQuickReport } from '@/lib/database';
@@ -13,6 +15,7 @@ import {
     ActivityIndicator,
     Image,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     Pressable,
     ScrollView,
@@ -24,6 +27,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type StatusBadge = 'tnr' | 'healthy' | 'hungry' | 'injured';
+type CatSex = 'male' | 'female' | 'unknown';
+type CatAge = 'kitten' | 'adult' | 'senior' | 'unknown';
 
 const STATUS_BADGES: { id: StatusBadge; label: string; icon: string; color: string }[] = [
     { id: 'tnr', label: 'TNR', icon: 'shield.fill', color: '#8B5CF6' },
@@ -32,15 +37,16 @@ const STATUS_BADGES: { id: StatusBadge; label: string; icon: string; color: stri
     { id: 'injured', label: 'Injured', icon: 'exclamationmark.triangle.fill', color: '#FF6B6B' },
 ];
 
-const COLOR_OPTIONS = [
-    { id: 'black', label: 'Black' },
-    { id: 'white', label: 'White' },
-    { id: 'orange', label: 'Orange' },
-    { id: 'gray', label: 'Gray' },
-    { id: 'tabby', label: 'Tabby' },
-    { id: 'calico', label: 'Calico' },
-    { id: 'tuxedo', label: 'Tuxedo' },
-    { id: 'siamese', label: 'Siamese' },
+const SEX_OPTIONS: { value: CatSex; label: string }[] = [
+    { value: 'male', label: 'Male' },
+    { value: 'female', label: 'Female' },
+    { value: 'unknown', label: 'Unknown' },
+];
+
+const AGE_OPTIONS: { value: CatAge; label: string }[] = [
+    { value: 'kitten', label: 'Kitten' },
+    { value: 'adult', label: 'Adult' },
+    { value: 'senior', label: 'Senior' },
 ];
 
 export default function ReportScreen() {
@@ -50,15 +56,21 @@ export default function ReportScreen() {
 
     // Form state
     const [name, setName] = useState('');
-    const [selectedColors, setSelectedColors] = useState<string[]>([]);
+    const [primaryColor, setPrimaryColor] = useState<CatColor | ''>('');
+    const [pattern, setPattern] = useState<CatPattern | ''>('');
+    const [sex, setSex] = useState<CatSex>('unknown');
+    const [age, setAge] = useState<CatAge>('adult');
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const [address, setAddress] = useState('');
     const [lastFed, setLastFed] = useState<Date | null>(null);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [selectedBadges, setSelectedBadges] = useState<StatusBadge[]>([]);
-    const [injuryDescription, setInjuryDescription] = useState('');
+    const [notes, setNotes] = useState('');
+    const [needsAttention, setNeedsAttention] = useState(false);
     const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [locationSheetVisible, setLocationSheetVisible] = useState(false);
+    const [colorPickerOpen, setColorPickerOpen] = useState(false);
+    const [patternPickerOpen, setPatternPickerOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [loadingLocation, setLoadingLocation] = useState(false);
 
@@ -91,12 +103,6 @@ export default function ReportScreen() {
             }
         })();
     }, []);
-
-    const toggleColor = (colorId: string) => {
-        setSelectedColors((prev) =>
-            prev.includes(colorId) ? prev.filter((c) => c !== colorId) : [...prev, colorId]
-        );
-    };
 
     const toggleBadge = (badgeId: StatusBadge) => {
         setSelectedBadges((prev) => {
@@ -142,6 +148,10 @@ export default function ReportScreen() {
             alert('Please set the cat\'s location.');
             return;
         }
+        if (!primaryColor) {
+            alert('Please select the main fur color.');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -156,17 +166,21 @@ export default function ReportScreen() {
 
             await submitQuickReport({
                 draftName: name.trim(),
-                description: selectedBadges.includes('injured') ? injuryDescription : undefined,
+                description: notes.trim() || undefined,
                 photoUri: photo?.uri,
                 latitude: location.latitude,
                 longitude: location.longitude,
                 locationDescription: address,
                 capturedAt: new Date().toISOString(),
                 rescueFlags: selectedBadges.includes('injured') ? ['injured'] : [],
-                colorTag: selectedColors[0] || null,
+                colorTag: primaryColor || null,
+                pattern: pattern || null,
+                sex,
+                approximateAge: age,
                 tnrStatus: selectedBadges.includes('tnr'),
                 status,
                 lastFed: lastFed?.toISOString(),
+                needsAttention,
             });
 
             alert('Cat profile created successfully!');
@@ -180,6 +194,8 @@ export default function ReportScreen() {
     };
 
     const isInjured = selectedBadges.includes('injured');
+    const selectedColorLabel = CAT_COLORS.find(c => c.value === primaryColor)?.label;
+    const selectedPatternLabel = CAT_PATTERNS.find(p => p.value === pattern)?.label;
 
     return (
         <KeyboardAvoidingView
@@ -221,28 +237,84 @@ export default function ReportScreen() {
                     />
                 </View>
 
-                {/* Color */}
+                {/* Main Fur Color */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Color</Text>
-                    <View style={styles.chipGrid}>
-                        {COLOR_OPTIONS.map((color) => {
-                            const active = selectedColors.includes(color.id);
-                            return (
-                                <Pressable
-                                    key={color.id}
-                                    onPress={() => toggleColor(color.id)}
-                                    style={[
-                                        styles.chip,
-                                        { backgroundColor: active ? Colors.primary.green : inputBg },
-                                        { borderColor: active ? Colors.primary.green : inputBorder },
-                                    ]}
-                                >
-                                    <Text style={[styles.chipText, { color: active ? '#0D1A0D' : textColor }]}>
-                                        {color.label}
-                                    </Text>
-                                </Pressable>
-                            );
-                        })}
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Main Fur Color *</Text>
+                    <Text style={[styles.helperText, { color: secondaryTextColor }]}>Choose the dominant color you see</Text>
+                    <Pressable
+                        onPress={() => setColorPickerOpen(true)}
+                        style={[styles.selectBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
+                    >
+                        {primaryColor ? (
+                            <View style={styles.selectContent}>
+                                {CAT_COLORS.find(c => c.value === primaryColor)?.hex && (
+                                    <View style={[styles.colorDot, { backgroundColor: CAT_COLORS.find(c => c.value === primaryColor)?.hex ?? '#ccc' }]} />
+                                )}
+                                <Text style={[styles.selectText, { color: textColor }]}>{selectedColorLabel}</Text>
+                            </View>
+                        ) : (
+                            <Text style={[styles.selectText, { color: secondaryTextColor }]}>Select color</Text>
+                        )}
+                        <SymbolView name="chevron.down" size={16} tintColor={secondaryTextColor} />
+                    </Pressable>
+                </View>
+
+                {/* Fur Pattern */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Fur Pattern</Text>
+                    <Text style={[styles.helperText, { color: secondaryTextColor }]}>Optional, but helpful for identification</Text>
+                    <Pressable
+                        onPress={() => setPatternPickerOpen(true)}
+                        style={[styles.selectBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
+                    >
+                        <Text style={[styles.selectText, { color: pattern ? textColor : secondaryTextColor }]}>
+                            {selectedPatternLabel || 'Select pattern'}
+                        </Text>
+                        <SymbolView name="chevron.down" size={16} tintColor={secondaryTextColor} />
+                    </Pressable>
+                </View>
+
+                {/* Sex */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Sex</Text>
+                    <View style={styles.segmentedControl}>
+                        {SEX_OPTIONS.map((option) => (
+                            <Pressable
+                                key={option.value}
+                                onPress={() => setSex(option.value)}
+                                style={[
+                                    styles.segmentedButton,
+                                    { backgroundColor: sex === option.value ? Colors.primary.blue : inputBg },
+                                    { borderColor: sex === option.value ? Colors.primary.blue : inputBorder },
+                                ]}
+                            >
+                                <Text style={[styles.segmentedText, { color: sex === option.value ? '#FFFFFF' : textColor }]}>
+                                    {option.label}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </View>
+
+                {/* Age */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Approximate Age</Text>
+                    <View style={styles.segmentedControl}>
+                        {AGE_OPTIONS.map((option) => (
+                            <Pressable
+                                key={option.value}
+                                onPress={() => setAge(option.value)}
+                                style={[
+                                    styles.segmentedButton,
+                                    { backgroundColor: age === option.value ? Colors.primary.blue : inputBg },
+                                    { borderColor: age === option.value ? Colors.primary.blue : inputBorder },
+                                ]}
+                            >
+                                <Text style={[styles.segmentedText, { color: age === option.value ? '#FFFFFF' : textColor }]}>
+                                    {option.label}
+                                </Text>
+                            </Pressable>
+                        ))}
                     </View>
                 </View>
 
@@ -329,26 +401,59 @@ export default function ReportScreen() {
                     </View>
                 </View>
 
-                {/* Injury Description (conditional) */}
-                {isInjured && (
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>
-                            Injury Description *
-                        </Text>
-                        <TextInput
-                            style={[
-                                styles.textInput,
-                                styles.multilineInput,
-                                { backgroundColor: inputBg, borderColor: inputBorder, color: textColor },
-                            ]}
-                            placeholder="Describe the injury or condition..."
-                            placeholderTextColor={secondaryTextColor}
-                            multiline
-                            value={injuryDescription}
-                            onChangeText={setInjuryDescription}
+                {/* Notes */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Notes</Text>
+                    <Text style={[styles.helperText, { color: secondaryTextColor }]}>Health, behavior, or identification details</Text>
+                    <TextInput
+                        style={[
+                            styles.textInput,
+                            styles.multilineInput,
+                            { backgroundColor: inputBg, borderColor: inputBorder, color: textColor },
+                        ]}
+                        placeholder="e.g., Visible limp, friendly, ear tipped..."
+                        placeholderTextColor={secondaryTextColor}
+                        multiline
+                        maxLength={200}
+                        value={notes}
+                        onChangeText={setNotes}
+                    />
+                </View>
+
+                {/* Needs Attention Toggle */}
+                <Pressable
+                    onPress={() => setNeedsAttention(!needsAttention)}
+                    style={[
+                        styles.attentionToggle,
+                        { 
+                            backgroundColor: needsAttention ? 'rgba(255,107,107,0.15)' : inputBg,
+                            borderColor: needsAttention ? '#FF6B6B' : inputBorder,
+                        },
+                    ]}
+                >
+                    <View style={styles.attentionContent}>
+                        <SymbolView 
+                            name={needsAttention ? 'exclamationmark.triangle.fill' : 'exclamationmark.triangle'} 
+                            size={20} 
+                            tintColor={needsAttention ? '#FF6B6B' : secondaryTextColor} 
                         />
+                        <View>
+                            <Text style={[styles.attentionTitle, { color: textColor }]}>Needs Attention?</Text>
+                            <Text style={[styles.attentionSubtitle, { color: secondaryTextColor }]}>
+                                This cat may need help
+                            </Text>
+                        </View>
                     </View>
-                )}
+                    <View style={[
+                        styles.checkbox,
+                        { 
+                            backgroundColor: needsAttention ? '#FF6B6B' : 'transparent',
+                            borderColor: needsAttention ? '#FF6B6B' : inputBorder,
+                        },
+                    ]}>
+                        {needsAttention && <SymbolView name="checkmark" size={12} tintColor="#FFFFFF" />}
+                    </View>
+                </Pressable>
             </ScrollView>
 
             {/* Submit Button */}
@@ -358,10 +463,113 @@ export default function ReportScreen() {
                     icon="checkmark.circle.fill"
                     variant="primary"
                     onPress={handleSubmit}
-                    disabled={loading || !name.trim() || !location}
+                    disabled={loading || !name.trim() || !location || !primaryColor}
                     style={{ width: '100%' }}
                 />
             </View>
+
+            {/* Color Picker Modal */}
+            <Modal
+                visible={colorPickerOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setColorPickerOpen(false)}
+            >
+                <Pressable style={styles.modalBackdrop} onPress={() => setColorPickerOpen(false)} />
+                <View style={styles.modalSheet}>
+                    <GlassView style={[styles.modalCard, { backgroundColor: isDark ? Colors.primary.dark : '#FFFFFF' }]} intensity={isDark ? 40 : 0}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: textColor }]}>Main Fur Color</Text>
+                            <Pressable onPress={() => setColorPickerOpen(false)} style={styles.modalClose}>
+                                <Text style={{ color: Colors.primary.blue, fontWeight: '600' }}>Done</Text>
+                            </Pressable>
+                        </View>
+                        <ScrollView contentContainerStyle={styles.pickerList}>
+                            {CAT_COLORS.map((color) => (
+                                <Pressable
+                                    key={color.value}
+                                    onPress={() => {
+                                        setPrimaryColor(color.value);
+                                        setColorPickerOpen(false);
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.pickerRow,
+                                        { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+                                        pressed && { opacity: 0.8 },
+                                    ]}
+                                >
+                                    <View style={styles.pickerRowContent}>
+                                        {color.hex && (
+                                            <View style={[styles.colorDot, { backgroundColor: color.hex }]} />
+                                        )}
+                                        <Text style={[styles.pickerRowText, { color: textColor }]}>{color.label}</Text>
+                                    </View>
+                                    {primaryColor === color.value && (
+                                        <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </GlassView>
+                </View>
+            </Modal>
+
+            {/* Pattern Picker Modal */}
+            <Modal
+                visible={patternPickerOpen}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setPatternPickerOpen(false)}
+            >
+                <Pressable style={styles.modalBackdrop} onPress={() => setPatternPickerOpen(false)} />
+                <View style={styles.modalSheet}>
+                    <GlassView style={[styles.modalCard, { backgroundColor: isDark ? Colors.primary.dark : '#FFFFFF' }]} intensity={isDark ? 40 : 0}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: textColor }]}>Fur Pattern</Text>
+                            <Pressable onPress={() => setPatternPickerOpen(false)} style={styles.modalClose}>
+                                <Text style={{ color: Colors.primary.blue, fontWeight: '600' }}>Done</Text>
+                            </Pressable>
+                        </View>
+                        <ScrollView contentContainerStyle={styles.pickerList}>
+                            <Pressable
+                                onPress={() => {
+                                    setPattern('');
+                                    setPatternPickerOpen(false);
+                                }}
+                                style={({ pressed }) => [
+                                    styles.pickerRow,
+                                    { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+                                    pressed && { opacity: 0.8 },
+                                ]}
+                            >
+                                <Text style={[styles.pickerRowText, { color: secondaryTextColor }]}>None</Text>
+                                {!pattern && (
+                                    <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
+                                )}
+                            </Pressable>
+                            {CAT_PATTERNS.map((p) => (
+                                <Pressable
+                                    key={p.value}
+                                    onPress={() => {
+                                        setPattern(p.value);
+                                        setPatternPickerOpen(false);
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.pickerRow,
+                                        { borderBottomColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
+                                        pressed && { opacity: 0.8 },
+                                    ]}
+                                >
+                                    <Text style={[styles.pickerRowText, { color: textColor }]}>{p.label}</Text>
+                                    {pattern === p.value && (
+                                        <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    </GlassView>
+                </View>
+            </Modal>
 
             {/* Location Modal */}
             <LocationAdjustModal
@@ -496,5 +704,127 @@ const styles = StyleSheet.create({
     submitContainer: {
         paddingHorizontal: 20,
         paddingTop: 16,
+    },
+    helperText: {
+        fontSize: 12,
+        marginTop: -6,
+    },
+    selectBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
+    selectContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    selectText: {
+        fontSize: 16,
+    },
+    colorDot: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+    },
+    segmentedControl: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    segmentedButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    segmentedText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    attentionToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
+    attentionContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    attentionTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    attentionSubtitle: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+    },
+    modalCard: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        maxHeight: 400,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: 'rgba(128,128,128,0.2)',
+    },
+    modalTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+    },
+    modalClose: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    pickerList: {
+        paddingBottom: 40,
+    },
+    pickerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    pickerRowContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    pickerRowText: {
+        fontSize: 16,
     },
 });

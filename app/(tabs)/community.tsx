@@ -44,80 +44,8 @@ type CommunityPost = {
     isTnr?: boolean;
 };
 
-const POSTS: CommunityPost[] = [
-    {
-        id: '1',
-        user: 'Sarah M.',
-        avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80',
-        content: 'Just spotted Whiskers near the deli! He looks well fed.',
-        time: '2h ago',
-        likes: 12,
-        comments: 3,
-        image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=600&q=80',
-        category: 'Sighting',
-        cats: [
-            { id: '1', name: 'Whiskers', isMine: true },
-            { id: '8', name: 'Oliver' },
-        ],
-        isUrgent: false,
-        isTnr: true,
-        likedByMe: false,
-        commentThread: [
-            { id: 'c1', user: 'Mike R.', content: 'Nice — I saw him yesterday too.', time: '1h' },
-        ],
-    },
-    {
-        id: '2',
-        user: 'Mike R.',
-        avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-        content: 'Does anyone know if Luna has been treated for her limp?',
-        time: '5h ago',
-        likes: 8,
-        comments: 5,
-        category: 'Question',
-        cats: [{ id: '2', name: 'Luna' }],
-        isUrgent: true,
-        isTnr: false,
-        likedByMe: false,
-        commentThread: [
-            { id: 'c2', user: 'Sarah M.', content: 'Not sure — she looked better a few days ago.', time: '3h' },
-        ],
-    },
-    {
-        id: '3',
-        user: 'Jenny L.',
-        avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-        content: 'Found a new kitten on 4th street. Very small, needs a foster!',
-        time: '1d ago',
-        likes: 24,
-        comments: 10,
-        image: 'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&w=600&q=80',
-        category: 'Medical Alert',
-        cats: [{ id: 'new-4th', name: '4th Street Kitten' }],
-        isUrgent: true,
-        isTnr: false,
-        likedByMe: false,
-        commentThread: [],
-    },
-    {
-        id: '4',
-        user: 'Community Ops',
-        avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=150&q=80',
-        content: 'Shadow’s adoption is complete! Thanks everyone for helping with transport.',
-        time: '3d ago',
-        likes: 54,
-        comments: 12,
-        category: 'Success Story',
-        cats: [{ id: '5', name: 'Shadow', isMine: true }],
-        isUrgent: false,
-        isTnr: true,
-        likedByMe: true,
-        commentThread: [
-            { id: 'c3', user: 'Jenny L.', content: 'Amazing news!', time: '2d' },
-            { id: 'c4', user: 'Sarah M.', content: 'So happy for Shadow.', time: '2d' },
-        ],
-    },
-];
+// Posts are stored locally and created by users - no mock data
+// TODO: Create a community_posts table in Supabase for persistence across devices
 
 const FILTERS = [
     { id: 'all', label: 'All' },
@@ -131,7 +59,7 @@ export default function CommunityScreen() {
     const insets = useSafeAreaInsets();
     const { isDark } = useTheme();
     const [activeFilter, setActiveFilter] = useState<FilterId>('all');
-    const [posts, setPosts] = useState<CommunityPost[]>(POSTS);
+    const [posts, setPosts] = useState<CommunityPost[]>([]);
     const [commentingPostId, setCommentingPostId] = useState<string | null>(null);
     const [commentDraft, setCommentDraft] = useState('');
 

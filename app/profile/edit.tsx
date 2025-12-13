@@ -18,6 +18,17 @@ import {
   View,
 } from 'react-native';
 
+const ROLES = [
+  'Neighbor',
+  'Feeder',
+  'Spotter',
+  'Foster',
+  'Vet Partner',
+  'Shelter Partner',
+] as const;
+
+type Role = typeof ROLES[number];
+
 export default function EditProfileScreen() {
   const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -27,8 +38,10 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [area, setArea] = useState<string>('');
+  const [role, setRole] = useState<Role | ''>('');
 
   const [areaPickerOpen, setAreaPickerOpen] = useState(false);
+  const [rolePickerOpen, setRolePickerOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -46,11 +59,13 @@ export default function EditProfileScreen() {
       const initialEmail = user.email ?? '';
       const initialName = (user.user_metadata?.name as string | undefined) ?? initialEmail.split('@')[0] ?? '';
       const initialArea = (user.user_metadata?.area as string | undefined) ?? '';
+      const initialRole = (user.user_metadata?.role as Role | undefined) ?? '';
 
       setCurrentEmail(initialEmail);
       setEmail(initialEmail);
       setName(initialName);
       setArea(initialArea);
+      setRole(initialRole);
       setLoading(false);
     };
 
@@ -92,6 +107,7 @@ export default function EditProfileScreen() {
           ...existingMetadata,
           name: nextName,
           area: nextArea || null,
+          role: role || null,
         },
       });
 
@@ -187,6 +203,27 @@ export default function EditProfileScreen() {
               <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>›</Text>
             </Pressable>
           </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Role</Text>
+            <Pressable
+              onPress={() => setRolePickerOpen(true)}
+              disabled={loading || saving}
+              style={({ pressed }) => [
+                styles.select,
+                {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+                  borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+                },
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>
+                {role ? role : 'Select a role'}
+              </Text>
+              <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>›</Text>
+            </Pressable>
+          </View>
         </GlassView>
 
         <View style={styles.actions}>
@@ -249,6 +286,62 @@ export default function EditProfileScreen() {
                   <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>{value}</Text>
                   <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>
                     {area === value ? '✓' : ''}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </GlassView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={rolePickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRolePickerOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setRolePickerOpen(false)} />
+        <View style={styles.modalSheet}>
+          <GlassView style={styles.modalCard} intensity={isDark ? 40 : 0}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Choose role</Text>
+              <Pressable onPress={() => setRolePickerOpen(false)} style={styles.modalClose}>
+                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>Done</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.areaList} keyboardShouldPersistTaps="handled">
+              <Pressable
+                onPress={() => {
+                  setRole('');
+                  setRolePickerOpen(false);
+                }}
+                style={({ pressed }) => [
+                  styles.areaRow,
+                  { borderTopColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>None</Text>
+                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>{role ? '' : '✓'}</Text>
+              </Pressable>
+
+              {ROLES.map((value) => (
+                <Pressable
+                  key={value}
+                  onPress={() => {
+                    setRole(value);
+                    setRolePickerOpen(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.areaRow,
+                    { borderTopColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                >
+                  <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>{value}</Text>
+                  <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>
+                    {role === value ? '✓' : ''}
                   </Text>
                 </Pressable>
               ))}

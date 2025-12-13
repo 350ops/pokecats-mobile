@@ -1,12 +1,13 @@
 import { CatCard } from '@/components/CatCard';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
-import { Cat, MOCK_CATS } from '@/constants/MockData';
+import { Cat } from '@/constants/MockData';
 import { useTheme } from '@/context/ThemeContext';
 import { getCats } from '@/lib/database';
+import * as Location from 'expo-location';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,8 +26,11 @@ type SortOption = {
 const GRID_GAP = 15;
 const LIST_PADDING = 20;
 const CARD_WIDTH = (Dimensions.get('window').width - LIST_PADDING * 2 - GRID_GAP) / 2;
-const USER_REFERENCE_COORDS = { latitude: 25.3712, longitude: 51.5484 };
+const DEFAULT_COORDS = { latitude: 25.3712, longitude: 51.5484 }; // Fallback if location unavailable
 const SKELETON_ITEMS = Array.from({ length: 6 });
+
+// User location will be stored here and updated dynamically
+let userCoords = { ...DEFAULT_COORDS };
 
 const SORT_OPTIONS: SortOption[] = [
     {
@@ -82,9 +86,39 @@ export default function DiscoverScreen() {
     const [sortOption, setSortOption] = useState<SortOption>(SORT_OPTIONS[0]);
     const [sortSheetVisible, setSortSheetVisible] = useState(false);
     const [urgentOnly, setUrgentOnly] = useState(false);
+    const [locationReady, setLocationReady] = useState(false);
     const shimmerAnimated = useRef(new Animated.Value(0)).current;
 
     const backgroundColor = isDark ? Colors.primary.dark : Colors.light.background;
+
+    // Fetch user's current location
+    useEffect(() => {
+        let isMounted = true;
+        (async () => {
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({ 
+                        accuracy: Location.Accuracy.Balanced 
+                    });
+                    if (isMounted) {
+                        userCoords = {
+                            latitude: location.coords.latitude,
+                            longitude: location.coords.longitude,
+                        };
+                        setLocationReady(true);
+                    }
+                } else {
+                    // Use default coords if permission denied
+                    if (isMounted) setLocationReady(true);
+                }
+            } catch (error) {
+                console.error('Failed to get location:', error);
+                if (isMounted) setLocationReady(true);
+            }
+        })();
+        return () => { isMounted = false; };
+    }, []);
 
     useFocusEffect(
         useCallback(() => {
@@ -100,12 +134,12 @@ export default function DiscoverScreen() {
                     if (data && data.length) {
                         setCats(data.map((cat) => normalizeCat(cat)));
                     } else {
-                        setCats(createFallbackCats());
+                        setCats([]);
                     }
                 } catch (error) {
                     console.error('Failed to load cats', error);
                     if (isActive) {
-                        setCats(createFallbackCats());
+                        setCats([]);
                     }
                 } finally {
                     if (isActive) {
@@ -119,7 +153,7 @@ export default function DiscoverScreen() {
             return () => {
                 isActive = false;
             };
-        }, [getCats, createFallbackCats, normalizeCat])
+        }, [getCats, normalizeCat, locationReady])
     );
 
     React.useEffect(() => {
@@ -311,11 +345,6 @@ const normalizeCat = (cat: any): NormalizedCat => {
     };
 };
 
-const createFallbackCats = () =>
-    MOCK_CATS.map((cat) => ({
-        ...cat,
-        distanceMeters: cat.distanceMeters ?? parseDistanceString(cat.distance),
-    }));
 
 const getTimestamp = (value?: string | Date | null) => {
     if (!value) return 0;
@@ -329,9 +358,9 @@ const computeDistanceMeters = (cat: any) => {
     const longitude = typeof cat.longitude === 'number' ? cat.longitude : typeof cat.lon === 'number' ? cat.lon : null;
     if (latitude != null && longitude != null) {
         const earthRadius = 6371000; // meters
-        const dLat = deg2rad(latitude - USER_REFERENCE_COORDS.latitude);
-        const dLon = deg2rad(longitude - USER_REFERENCE_COORDS.longitude);
-        const lat1 = deg2rad(USER_REFERENCE_COORDS.latitude);
+        const dLat = deg2rad(latitude - userCoords.latitude);
+        const dLon = deg2rad(longitude - userCoords.longitude);
+        const lat1 = deg2rad(userCoords.latitude);
         const lat2 = deg2rad(latitude);
         const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
