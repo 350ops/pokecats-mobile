@@ -160,20 +160,24 @@ export default function DiscoverScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor }]}>
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <View style={styles.headerLeft}>
-                    <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                <GlassView style={styles.headerButton} intensity={70}>
+                    <Pressable onPress={() => router.back()} style={styles.headerButtonInner}>
                         <SymbolView name="chevron.left" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={22} />
                     </Pressable>
-                    <View>
-                        <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Nearby Cats</Text>
-                        <Text style={[styles.subtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{headerSubtitle}</Text>
-                    </View>
-                </View>
-                <Pressable style={styles.sortButton} onPress={handleSortPress}>
-                    <SymbolView name="line.3.horizontal.decrease.circle" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
-                    <Text style={[styles.sortButtonText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Sort / Filter</Text>
-                </Pressable>
+                </GlassView>
+
+                <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Nearby Cats</Text>
+
+                <GlassView style={styles.headerButtonGroup} intensity={70}>
+                    <Pressable onPress={() => router.push('/report')} style={styles.headerGroupButton}>
+                        <SymbolView name="plus" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
+                    </Pressable>
+                    <View style={[styles.headerButtonDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }]} />
+                    <Pressable onPress={handleSortPress} style={styles.headerGroupButton}>
+                        <SymbolView name="ellipsis" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
+                    </Pressable>
+                </GlassView>
             </View>
 
             <View style={styles.filterRow}>
@@ -368,29 +372,39 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    headerLeft: {
+    headerButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+    },
+    headerButtonInner: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerButtonGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        height: 48,
+        borderRadius: 24,
+        overflow: 'hidden',
+        paddingHorizontal: 4,
     },
-    backButton: {
-        padding: 4,
+    headerButtonDivider: {
+        width: 1,
+        height: 22,
+        marginHorizontal: 2,
+    },
+    headerGroupButton: {
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     title: {
-        fontSize: 28,
+        fontSize: 20,
         fontWeight: '700',
-    },
-    subtitle: {
-        fontSize: 14,
-        marginTop: 4,
-    },
-    sortButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 18,
     },
     filterRow: {
         paddingHorizontal: LIST_PADDING,
@@ -414,12 +428,6 @@ const styles = StyleSheet.create({
     },
     filterChipTextActive: {
         color: '#021206',
-    },
-    sortButtonText: {
-        color: Colors.glass.text,
-        fontWeight: '600',
-        fontSize: 13,
-        marginLeft: 6,
     },
     listContent: {
         paddingHorizontal: LIST_PADDING,

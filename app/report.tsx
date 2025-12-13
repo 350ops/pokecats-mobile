@@ -1,565 +1,500 @@
 import { LocationAdjustModal } from '@/components/LocationAdjustModal';
 import { GlassButton } from '@/components/ui/GlassButton';
-import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
-import { COLOR_TAGS, KEYWORD_HINTS, RESCUE_FLAGS, getFlagColor } from '@/constants/Report';
 import { useTheme } from '@/context/ThemeContext';
-import { getCats, submitQuickReport } from '@/lib/database';
+import { submitQuickReport } from '@/lib/database';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type Suggestion = {
-    cat: any;
-    distance: number;
-    score: number;
-};
+type StatusBadge = 'tnr' | 'healthy' | 'hungry' | 'injured';
+
+const STATUS_BADGES: { id: StatusBadge; label: string; icon: string; color: string }[] = [
+    { id: 'tnr', label: 'TNR', icon: 'shield.fill', color: '#8B5CF6' },
+    { id: 'healthy', label: 'Healthy', icon: 'checkmark.circle.fill', color: Colors.primary.green },
+    { id: 'hungry', label: 'Hungry', icon: 'fork.knife', color: Colors.primary.yellow },
+    { id: 'injured', label: 'Injured', icon: 'exclamationmark.triangle.fill', color: '#FF6B6B' },
+];
+
+const COLOR_OPTIONS = [
+    { id: 'black', label: 'Black' },
+    { id: 'white', label: 'White' },
+    { id: 'orange', label: 'Orange' },
+    { id: 'gray', label: 'Gray' },
+    { id: 'tabby', label: 'Tabby' },
+    { id: 'calico', label: 'Calico' },
+    { id: 'tuxedo', label: 'Tuxedo' },
+    { id: 'siamese', label: 'Siamese' },
+];
 
 export default function ReportScreen() {
+    const insets = useSafeAreaInsets();
     const { isDark } = useTheme();
     const router = useRouter();
+
+    // Form state
+    const [name, setName] = useState('');
+    const [selectedColors, setSelectedColors] = useState<string[]>([]);
+    const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [address, setAddress] = useState('');
+    const [lastFed, setLastFed] = useState<Date | null>(null);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+    const [selectedBadges, setSelectedBadges] = useState<StatusBadge[]>([]);
+    const [injuryDescription, setInjuryDescription] = useState('');
     const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
-    const [capturedAt, setCapturedAt] = useState<Date | null>(null);
-    const [location, setLocation] = useState<Location.LocationObject | null>(null);
-    const [address, setAddress] = useState<string>('');
-    const [cats, setCats] = useState<any[]>([]);
-    const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
-    const [rescueFlags, setRescueFlags] = useState<string[]>([]);
-    const [colorTag, setColorTag] = useState<string | null>(null);
-    const [notes, setNotes] = useState('');
-    const [keywordHint, setKeywordHint] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [locationSheetVisible, setLocationSheetVisible] = useState(false);
-    const [autoCapturing, setAutoCapturing] = useState(false);
-    const hasAttemptedCapture = useRef(false);
+    const [loading, setLoading] = useState(false);
+    const [loadingLocation, setLoadingLocation] = useState(false);
 
     const backgroundColor = isDark ? Colors.primary.dark : Colors.light.background;
+    const textColor = isDark ? Colors.glass.text : Colors.light.text;
+    const secondaryTextColor = isDark ? Colors.glass.textSecondary : Colors.light.icon;
+    const inputBg = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)';
+    const inputBorder = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)';
 
-    useFocusEffect(
-        useCallback(() => {
-            if (!hasAttemptedCapture.current) {
-                hasAttemptedCapture.current = true;
-                startQuickCapture();
-            }
-        }, [])
-    );
-
+    // Get user's current location on mount
     useEffect(() => {
-        getCats().then(setCats);
-    }, []);
-
-    useEffect(() => {
-        const lowered = notes.toLowerCase();
-        const hint = KEYWORD_HINTS.find(({ keywords }) =>
-            keywords.some((keyword) => lowered.includes(keyword))
-        );
-        setKeywordHint(hint ? hint.hint : null);
-    }, [notes]);
-
-    const suggestions: Suggestion[] = useMemo(() => {
-        if (!location || !cats.length) return [];
-        return cats
-            .map((cat) => {
-                const distance = computeDistanceMeters(
-                    location.coords.latitude,
-                    location.coords.longitude,
-                    cat.latitude,
-                    cat.longitude
-                );
-                const recencyScore = isRecentlySeen(cat.lastSighted) ? 1 : 0;
-                const colorScore = colorTag && Array.isArray(cat.colorProfile) && cat.colorProfile.includes(colorTag) ? 1 : 0;
-                const proximityScore = distance < 400 ? 2 : distance < 800 ? 1 : 0;
-                const score = recencyScore + colorScore + proximityScore;
-                return { cat, distance, score };
-            })
-            .filter(({ score }) => score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 3);
-    }, [cats, location, colorTag]);
-
-    const selectedCat = selectedCatId ? cats.find((cat) => Number(cat.id) === selectedCatId) : null;
-
-    const startQuickCapture = useCallback(async () => {
-        try {
-            setAutoCapturing(true);
-            const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
-            if (!cameraPerm.granted) {
-                alert('Camera permission is required to submit a quick report.');
-                return;
-            }
-            const locationPerm = await Location.requestForegroundPermissionsAsync();
-            const capture = await ImagePicker.launchCameraAsync({
-                allowsEditing: false,
-                quality: 0.6,
-                base64: false,
-            });
-            if (capture.canceled) {
-                return;
-            }
-            const asset = capture.assets[0];
-            setPhoto(asset);
-            setCapturedAt(new Date());
-            if (locationPerm.granted) {
-                const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-                setLocation(loc);
-                try {
-                    const [geo] = await Location.reverseGeocodeAsync(loc.coords);
-                    setAddress(formatAddress(geo));
-                } catch (error) {
-                    console.warn('Reverse geocode failed', error);
+        (async () => {
+            setLoadingLocation(true);
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+                    setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+                    try {
+                        const [geo] = await Location.reverseGeocodeAsync(loc.coords);
+                        setAddress(formatAddress(geo));
+                    } catch {
+                        // Ignore geocode errors
+                    }
                 }
+            } catch (error) {
+                console.warn('Failed to get location', error);
+            } finally {
+                setLoadingLocation(false);
             }
-        } catch (error) {
-            console.error(error);
-            alert('Unable to open the camera. Please try again.');
-        } finally {
-            setAutoCapturing(false);
-        }
+        })();
     }, []);
 
-    const handleFlagToggle = (flagId: string) => {
-        setRescueFlags((prev) =>
-            prev.includes(flagId) ? prev.filter((id) => id !== flagId) : [...prev, flagId]
+    const toggleColor = (colorId: string) => {
+        setSelectedColors((prev) =>
+            prev.includes(colorId) ? prev.filter((c) => c !== colorId) : [...prev, colorId]
         );
     };
 
-    const handleQuickSubmit = async () => {
-        if (!photo || !location) {
-            alert('Capture a photo and location first.');
+    const toggleBadge = (badgeId: StatusBadge) => {
+        setSelectedBadges((prev) => {
+            if (prev.includes(badgeId)) {
+                return prev.filter((b) => b !== badgeId);
+            }
+            // If selecting healthy, remove hungry/injured and vice versa
+            if (badgeId === 'healthy') {
+                return [...prev.filter((b) => b !== 'hungry' && b !== 'injured'), badgeId];
+            }
+            if (badgeId === 'hungry' || badgeId === 'injured') {
+                return [...prev.filter((b) => b !== 'healthy'), badgeId];
+            }
+            return [...prev, badgeId];
+        });
+    };
+
+    const pickPhoto = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+        if (!result.canceled && result.assets[0]) {
+            setPhoto(result.assets[0]);
+        }
+    };
+
+    const handleTimeChange = (_: any, selectedDate?: Date) => {
+        setShowTimePicker(Platform.OS === 'ios');
+        if (selectedDate) {
+            setLastFed(selectedDate);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!name.trim()) {
+            alert('Please enter a name for the cat.');
             return;
         }
+        if (!location) {
+            alert('Please set the cat\'s location.');
+            return;
+        }
+
         try {
             setLoading(true);
-            setStatusMessage(null);
+            
+            // Determine status based on badges
+            let status = 'Healthy';
+            if (selectedBadges.includes('injured')) {
+                status = 'Needs Help';
+            } else if (selectedBadges.includes('hungry')) {
+                status = 'Hungry';
+            }
+
             await submitQuickReport({
-                catId: selectedCatId ?? undefined,
-                draftName: selectedCat?.name,
-                description: notes,
-                photoUri: photo.uri,
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
+                draftName: name.trim(),
+                description: selectedBadges.includes('injured') ? injuryDescription : undefined,
+                photoUri: photo?.uri,
+                latitude: location.latitude,
+                longitude: location.longitude,
                 locationDescription: address,
-                capturedAt: capturedAt?.toISOString(),
-                rescueFlags,
-                colorTag,
+                capturedAt: new Date().toISOString(),
+                rescueFlags: selectedBadges.includes('injured') ? ['injured'] : [],
+                colorTag: selectedColors[0] || null,
+                tnrStatus: selectedBadges.includes('tnr'),
+                status,
+                lastFed: lastFed?.toISOString(),
             });
-            setStatusMessage('Quick report submitted. Thank you!');
-            resetForm();
+
+            alert('Cat profile created successfully!');
+            router.back();
         } catch (error) {
             console.error(error);
-            alert('Failed to submit report. Try again in a moment.');
+            alert('Failed to create cat profile. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    const resetForm = () => {
-        setNotes('');
-        setRescueFlags([]);
-        setColorTag(null);
-        setSelectedCatId(null);
-        setPhoto(null);
-        setCapturedAt(null);
-        setAddress('');
-        hasAttemptedCapture.current = false;
-    };
-
-    const handleAddDetails = () => {
-        if (!photo || !location) {
-            alert('Capture info first.');
-            return;
-        }
-        const payload = {
-            photoUri: photo.uri,
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            address,
-            capturedAt: capturedAt?.toISOString(),
-            rescueFlags,
-            colorTag,
-            selectedCatId,
-            notes,
-        };
-        router.push({
-            pathname: '/modal',
-            params: { seed: encodeURIComponent(JSON.stringify(payload)) },
-        });
-    };
+    const isInjured = selectedBadges.includes('injured');
 
     return (
         <KeyboardAvoidingView
             style={[styles.container, { backgroundColor }]}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-            {photo ? (
-                <>
-                    <Image source={{ uri: photo.uri }} style={styles.preview} />
-                    <GlassView style={styles.sheet} intensity={85}>
-                        <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Captured</Text>
-                                <Text style={styles.sectionValue}>{capturedAt ? capturedAt.toLocaleString() : 'Just now'}</Text>
-                            </View>
 
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Location</Text>
-                                <Text style={styles.sectionValue}>{address || 'Using GPS coordinates'}</Text>
-                                <Pressable style={styles.inlineButton} onPress={() => setLocationSheetVisible(true)}>
-                                    <SymbolView name="mappin.circle.fill" size={18} tintColor={Colors.primary.green} />
-                                    <Text style={styles.inlineButtonText}>Adjust pin on map</Text>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[styles.scrollContent, { paddingTop: 20, paddingBottom: insets.bottom + 100 }]}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Photo */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Photo</Text>
+                    <Pressable onPress={pickPhoto} style={[styles.photoPickerBox, { borderColor: inputBorder }]}>
+                        {photo ? (
+                            <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
+                        ) : (
+                            <View style={styles.photoPlaceholder}>
+                                <SymbolView name="photo.on.rectangle" size={40} tintColor={secondaryTextColor} />
+                                <Text style={[styles.photoPlaceholderText, { color: secondaryTextColor }]}>
+                                    Tap to select photo
+                                </Text>
+                            </View>
+                        )}
+                    </Pressable>
+                </View>
+
+                {/* Name */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Name *</Text>
+                    <TextInput
+                        style={[styles.textInput, { backgroundColor: inputBg, borderColor: inputBorder, color: textColor }]}
+                        placeholder="Enter cat's name"
+                        placeholderTextColor={secondaryTextColor}
+                        value={name}
+                        onChangeText={setName}
+                    />
+                </View>
+
+                {/* Color */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Color</Text>
+                    <View style={styles.chipGrid}>
+                        {COLOR_OPTIONS.map((color) => {
+                            const active = selectedColors.includes(color.id);
+                            return (
+                                <Pressable
+                                    key={color.id}
+                                    onPress={() => toggleColor(color.id)}
+                                    style={[
+                                        styles.chip,
+                                        { backgroundColor: active ? Colors.primary.green : inputBg },
+                                        { borderColor: active ? Colors.primary.green : inputBorder },
+                                    ]}
+                                >
+                                    <Text style={[styles.chipText, { color: active ? '#0D1A0D' : textColor }]}>
+                                        {color.label}
+                                    </Text>
                                 </Pressable>
-                            </View>
+                            );
+                        })}
+                    </View>
+                </View>
 
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Rescue flags</Text>
-                                <View style={styles.flagGrid}>
-                                    {RESCUE_FLAGS.map((flag) => {
-                                        const active = rescueFlags.includes(flag.id);
-                                        return (
-                                            <Pressable
-                                                key={flag.id}
-                                                style={[
-                                                    styles.flagChip,
-                                                    { borderColor: active ? getFlagColor(flag.severity) : 'rgba(255,255,255,0.1)' },
-                                                    active && { backgroundColor: 'rgba(255,255,255,0.1)' },
-                                                ]}
-                                                onPress={() => handleFlagToggle(flag.id)}
-                                            >
-                                                <SymbolView name={flag.icon as any} size={16} tintColor={getFlagColor(flag.severity)} />
-                                                <Text style={styles.flagChipText}>{flag.label}</Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Color profile</Text>
-                                <View style={styles.flagGrid}>
-                                    {COLOR_TAGS.map((color) => {
-                                        const active = color.id === colorTag;
-                                        return (
-                                            <Pressable
-                                                key={color.id}
-                                                style={[
-                                                    styles.colorChip,
-                                                    active && { backgroundColor: Colors.primary.green },
-                                                ]}
-                                                onPress={() => setColorTag(active ? null : color.id)}
-                                            >
-                                                <Text style={[styles.colorChipText, active && { color: '#0D1A0D' }]}>{color.label}</Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                            </View>
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Is this an existing cat?</Text>
-                                {suggestions.length ? (
-                                    suggestions.map(({ cat, distance }) => {
-                                        const active = selectedCatId === cat.id;
-                                        return (
-                                            <Pressable
-                                                key={cat.id}
-                                                style={[
-                                                    styles.suggestionCard,
-                                                    active && styles.suggestionCardActive,
-                                                ]}
-                                                onPress={() => setSelectedCatId(cat.id)}
-                                            >
-                                                <View>
-                                                    <Text style={styles.suggestionTitle}>{cat.name}</Text>
-                                                    <Text style={styles.suggestionMeta}>
-                                                        {formatDistance(distance)} • Seen {getTimeAgo(cat.lastSighted)}
-                                                    </Text>
-                                                </View>
-                                                {active && <SymbolView name="checkmark.circle.fill" size={22} tintColor={Colors.primary.green} />}
-                                            </Pressable>
-                                        );
-                                    })
-                                ) : (
-                                    <Text style={styles.sectionValue}>No close matches nearby.</Text>
-                                )}
-                                <Pressable style={styles.inlineButton} onPress={() => setSelectedCatId(null)}>
-                                    <SymbolView name="plus.circle" size={18} tintColor={Colors.glass.text} />
-                                    <Text style={styles.inlineButtonText}>Report as new cat</Text>
-                                </Pressable>
-                            </View>
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionLabel}>Notes</Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Share quick details (limping, collar, etc.)"
-                                    placeholderTextColor="rgba(255,255,255,0.6)"
-                                    multiline
-                                    value={notes}
-                                    onChangeText={setNotes}
-                                />
-                                <Text style={styles.charCount}>{notes.length}/280</Text>
-                                {keywordHint && (
-                                    <Text style={styles.hintText}>{keywordHint}</Text>
-                                )}
-                            </View>
-                        </ScrollView>
-
-                        <View style={styles.actionRow}>
-                            <GlassButton
-                                title="Looks okay"
-                                icon="paperplane.fill"
-                                variant="glass"
-                                onPress={handleQuickSubmit}
-                                disabled={loading}
-                                style={{ flex: 1 }}
-                            />
-                            <GlassButton
-                                title="Add details"
-                                icon="square.and.pencil"
-                                variant="primary"
-                                onPress={handleAddDetails}
-                                disabled={loading}
-                                style={{ flex: 1 }}
-                            />
+                {/* Location */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Location *</Text>
+                    <Pressable
+                        onPress={() => setLocationSheetVisible(true)}
+                        style={[styles.locationBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
+                    >
+                        <SymbolView name="mappin.circle.fill" size={24} tintColor={Colors.primary.green} />
+                        <View style={styles.locationTextWrapper}>
+                            {loadingLocation ? (
+                                <ActivityIndicator size="small" color={Colors.primary.green} />
+                            ) : location ? (
+                                <>
+                                    <Text style={[styles.locationText, { color: textColor }]}>
+                                        {address || 'Location set'}
+                                    </Text>
+                                    <Text style={[styles.locationCoords, { color: secondaryTextColor }]}>
+                                        {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                                    </Text>
+                                </>
+                            ) : (
+                                <Text style={[styles.locationText, { color: secondaryTextColor }]}>
+                                    Tap to set location on map
+                                </Text>
+                            )}
                         </View>
-                        <GlassButton
-                            title="Retake photo"
-                            icon="camera.rotate"
-                            variant="glass"
-                            onPress={startQuickCapture}
+                        <SymbolView name="chevron.right" size={16} tintColor={secondaryTextColor} />
+                    </Pressable>
+                </View>
+
+                {/* Last Fed */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Last Fed</Text>
+                    <Pressable
+                        onPress={() => setShowTimePicker(true)}
+                        style={[styles.timePickerBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
+                    >
+                        <SymbolView name="clock.fill" size={20} tintColor={Colors.primary.yellow} />
+                        <Text style={[styles.timePickerText, { color: lastFed ? textColor : secondaryTextColor }]}>
+                            {lastFed ? lastFed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select time'}
+                        </Text>
+                    </Pressable>
+                    {showTimePicker && (
+                        <DateTimePicker
+                            value={lastFed || new Date()}
+                            mode="time"
+                            is24Hour={true}
+                            display="spinner"
+                            onChange={handleTimeChange}
                         />
-                    </GlassView>
-                </>
-            ) : (
-                <View style={styles.placeholder}>
-                    {autoCapturing ? (
-                        <>
-                            <ActivityIndicator color={Colors.primary.green} />
-                            <Text style={styles.placeholderText}>Opening camera…</Text>
-                        </>
-                    ) : (
-                        <>
-                            <Text style={styles.placeholderText}>Tap below to start a quick report.</Text>
-                            <GlassButton title="Launch camera" icon="camera.fill" onPress={startQuickCapture} />
-                        </>
                     )}
-                    {statusMessage && <Text style={styles.hintText}>{statusMessage}</Text>}
                 </View>
-            )}
 
-            {loading && (
-                <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="large" color={Colors.primary.green} />
-                    <Text style={styles.loadingText}>Submitting report…</Text>
+                {/* Status Badges */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Status</Text>
+                    <View style={styles.chipGrid}>
+                        {STATUS_BADGES.map((badge) => {
+                            const active = selectedBadges.includes(badge.id);
+                            return (
+                                <Pressable
+                                    key={badge.id}
+                                    onPress={() => toggleBadge(badge.id)}
+                                    style={[
+                                        styles.badgeChip,
+                                        { backgroundColor: active ? badge.color : inputBg },
+                                        { borderColor: active ? badge.color : inputBorder },
+                                    ]}
+                                >
+                                    <SymbolView
+                                        name={badge.icon as any}
+                                        size={16}
+                                        tintColor={active ? '#FFFFFF' : badge.color}
+                                    />
+                                    <Text style={[styles.badgeChipText, { color: active ? '#FFFFFF' : textColor }]}>
+                                        {badge.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
                 </View>
-            )}
 
+                {/* Injury Description (conditional) */}
+                {isInjured && (
+                    <View style={styles.section}>
+                        <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>
+                            Injury Description *
+                        </Text>
+                        <TextInput
+                            style={[
+                                styles.textInput,
+                                styles.multilineInput,
+                                { backgroundColor: inputBg, borderColor: inputBorder, color: textColor },
+                            ]}
+                            placeholder="Describe the injury or condition..."
+                            placeholderTextColor={secondaryTextColor}
+                            multiline
+                            value={injuryDescription}
+                            onChangeText={setInjuryDescription}
+                        />
+                    </View>
+                )}
+            </ScrollView>
+
+            {/* Submit Button */}
+            <View style={[styles.submitContainer, { paddingBottom: insets.bottom + 16 }]}>
+                <GlassButton
+                    title={loading ? 'Saving...' : 'Save Cat Profile'}
+                    icon="checkmark.circle.fill"
+                    variant="primary"
+                    onPress={handleSubmit}
+                    disabled={loading || !name.trim() || !location}
+                    style={{ width: '100%' }}
+                />
+            </View>
+
+            {/* Location Modal */}
             <LocationAdjustModal
                 visible={locationSheetVisible}
-                coordinate={
-                    location
-                        ? { latitude: location.coords.latitude, longitude: location.coords.longitude }
-                        : undefined
-                }
+                coordinate={location || undefined}
                 onClose={() => setLocationSheetVisible(false)}
                 onSave={(coordinate) => {
-                    if (location) {
-                        setLocation({ ...location, coords: { ...location.coords, ...coordinate } });
-                    }
+                    setLocation(coordinate);
+                    // Try to reverse geocode the new location
+                    Location.reverseGeocodeAsync(coordinate)
+                        .then(([geo]) => setAddress(formatAddress(geo)))
+                        .catch(() => setAddress(''));
                 }}
             />
         </KeyboardAvoidingView>
     );
 }
 
-const isRecentlySeen = (value?: string | Date | null) => {
-    if (!value) return false;
-    const date = typeof value === 'string' ? new Date(value) : value;
-    if (!(date instanceof Date) || isNaN(date.getTime())) return false;
-    const diffHours = (Date.now() - date.getTime()) / (1000 * 60 * 60);
-    return diffHours <= 24;
-};
-
-const computeDistanceMeters = (lat1?: number, lon1?: number, lat2?: number, lon2?: number) => {
-    if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return Infinity;
-    const R = 6371000;
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return Math.round(R * c);
-};
-
-const deg2rad = (deg: number) => (deg * Math.PI) / 180;
-
 const formatAddress = (geo?: Location.LocationGeocodedAddress) => {
     if (!geo) return '';
     return [geo.name, geo.street, geo.city].filter(Boolean).join(', ');
-};
-
-const formatDistance = (meters: number) => {
-    if (!isFinite(meters)) return 'Unknown';
-    if (meters < 1000) return `${meters} m`;
-    return `${(meters / 1000).toFixed(1)} km`;
-};
-
-const getTimeAgo = (value?: string | Date | null) => {
-    if (!value) return 'Unknown';
-    const date = typeof value === 'string' ? new Date(value) : value;
-    if (!(date instanceof Date) || isNaN(date.getTime())) return 'Unknown';
-    const minutes = Math.round((Date.now() - date.getTime()) / 60000);
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.round(hours / 24);
-    return `${days}d`;
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    preview: {
+    scrollView: {
         flex: 1,
-        width: '100%',
     },
-    sheet: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 20,
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        gap: 16,
-    },
-    sheetContent: {
-        gap: 18,
-        paddingBottom: 10,
+    scrollContent: {
+        paddingHorizontal: 20,
+        gap: 24,
     },
     section: {
-        gap: 6,
+        gap: 10,
     },
     sectionLabel: {
-        color: Colors.glass.text,
-        fontWeight: '700',
-        fontSize: 14,
+        fontSize: 13,
+        fontWeight: '600',
         textTransform: 'uppercase',
-    },
-    sectionValue: {
-        color: Colors.glass.text,
-        fontSize: 16,
-    },
-    flagGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    flagChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
-        borderWidth: 1,
-    },
-    flagChipText: {
-        color: Colors.glass.text,
-        fontWeight: '600',
-    },
-    colorChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-    },
-    colorChipText: {
-        color: Colors.glass.text,
-        fontWeight: '600',
-    },
-    suggestionCard: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 14,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.04)',
-        marginBottom: 8,
-    },
-    suggestionCardActive: {
-        borderWidth: 1,
-        borderColor: Colors.primary.green,
-    },
-    suggestionTitle: {
-        color: Colors.glass.text,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    suggestionMeta: {
-        color: Colors.glass.textSecondary,
-        fontSize: 12,
+        letterSpacing: 0.5,
     },
     textInput: {
-        minHeight: 90,
-        borderRadius: 18,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        padding: 12,
-        color: Colors.glass.text,
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
     },
-    charCount: {
-        textAlign: 'right',
-        color: Colors.glass.textSecondary,
-        fontSize: 12,
+    multilineInput: {
+        minHeight: 100,
+        textAlignVertical: 'top',
     },
-    hintText: {
-        color: Colors.primary.yellow,
-        fontSize: 13,
-        marginTop: 6,
+    photoPickerBox: {
+        height: 180,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        overflow: 'hidden',
     },
-    actionRow: {
-        flexDirection: 'row',
-        gap: 12,
+    photoPreview: {
+        width: '100%',
+        height: '100%',
     },
-    placeholder: {
+    photoPlaceholder: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        gap: 10,
     },
-    placeholderText: {
-        color: Colors.glass.text,
-        marginBottom: 12,
-        fontSize: 16,
+    photoPlaceholderText: {
+        fontSize: 14,
     },
-    loadingOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.4)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
+    chipGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
     },
-    loadingText: {
-        color: Colors.glass.text,
+    chip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+    },
+    chipText: {
+        fontSize: 14,
         fontWeight: '600',
     },
-    inlineButton: {
+    badgeChip: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginTop: 4,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
     },
-    inlineButtonText: {
-        color: Colors.primary.green,
+    badgeChipText: {
+        fontSize: 14,
         fontWeight: '600',
+    },
+    locationBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
+    locationTextWrapper: {
+        flex: 1,
+    },
+    locationText: {
+        fontSize: 15,
+    },
+    locationCoords: {
+        fontSize: 12,
+        marginTop: 2,
+    },
+    timePickerBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
+    timePickerText: {
+        fontSize: 16,
+    },
+    submitContainer: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
     },
 });

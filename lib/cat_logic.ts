@@ -45,7 +45,7 @@ export const getCatStatusState = (cat: StatusCat): CatStatusState => {
         // Priority 3: "Healthy" AND "Last Fed <= 8h" -> Green/Healthy
         return {
             statusText: 'Healthy',
-            statusColor: 'rgb(133, 229, 105)', // Green
+            statusColor: 'rgb(47, 202, 0)', // Green
             markerColor: 'green',
             labelColor: '#ffffff'
         };
