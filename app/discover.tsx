@@ -4,7 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { Cat, MOCK_CATS } from '@/constants/MockData';
 import { useTheme } from '@/context/ThemeContext';
 import { getCats } from '@/lib/database';
-import { Link, useFocusEffect } from 'expo-router';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -75,6 +75,7 @@ const SORT_OPTIONS: SortOption[] = [
 
 export default function DiscoverScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const { isDark } = useTheme();
     const [cats, setCats] = useState<NormalizedCat[]>([]);
     const [loading, setLoading] = useState(true);
@@ -160,13 +161,18 @@ export default function DiscoverScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <View>
-                    <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.dark.text }]}>Nearby Cats</Text>
-                    <Text style={[styles.subtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{headerSubtitle}</Text>
+                <View style={styles.headerLeft}>
+                    <Pressable onPress={() => router.back()} style={styles.backButton}>
+                        <SymbolView name="chevron.left" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={22} />
+                    </Pressable>
+                    <View>
+                        <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Nearby Cats</Text>
+                        <Text style={[styles.subtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>{headerSubtitle}</Text>
+                    </View>
                 </View>
                 <Pressable style={styles.sortButton} onPress={handleSortPress}>
-                    <SymbolView name="line.3.horizontal.decrease.circle" tintColor={Colors.glass.text} size={20} />
-                    <Text style={styles.sortButtonText}>Sort / Filter</Text>
+                    <SymbolView name="line.3.horizontal.decrease.circle" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
+                    <Text style={[styles.sortButtonText, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Sort / Filter</Text>
                 </Pressable>
             </View>
 
@@ -361,6 +367,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    backButton: {
+        padding: 4,
     },
     title: {
         fontSize: 28,
