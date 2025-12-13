@@ -3,10 +3,11 @@ import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { getCats } from '@/lib/database';
+import * as ImagePicker from 'expo-image-picker';
 import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Image, ImageBackground, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, ImageBackground, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type PostCategory = 'Sighting' | 'Medical Alert' | 'Question' | 'Success Story' | 'Urgent' | 'TNR';
@@ -138,7 +139,7 @@ export default function CommunityScreen() {
     const [newPostCategory, setNewPostCategory] = useState<PostCategory | null>(null);
     const [catSuggestions, setCatSuggestions] = useState<{ id: string; name: string }[]>([]);
     const [newPostContent, setNewPostContent] = useState('');
-    const [newPostImageUrl, setNewPostImageUrl] = useState('');
+    const [newPostPhoto, setNewPostPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const [newPostCats, setNewPostCats] = useState<string[]>([]);
     const [newPostCatDraft, setNewPostCatDraft] = useState('');
 
@@ -153,7 +154,24 @@ export default function CommunityScreen() {
         }
     }, [posts, activeFilter]);
 
-    const getCategoryStyle = (category: PostCategory) => {
+    const getCategoryStyle = (category: PostCategory, forModal = false) => {
+        // Pastel colors for modal, stronger colors for posts
+        if (forModal) {
+            switch (category) {
+                case 'Question':
+                    return { bg: 'rgba(99, 179, 237, 0.25)', border: 'rgba(99, 179, 237, 0.4)', text: '#63B3ED' };
+                case 'Medical Alert':
+                    return { bg: 'rgba(252, 129, 129, 0.25)', border: 'rgba(252, 129, 129, 0.4)', text: '#FC8181' };
+                case 'Success Story':
+                    return { bg: 'rgba(104, 211, 145, 0.25)', border: 'rgba(104, 211, 145, 0.4)', text: '#68D391' };
+                case 'Urgent':
+                    return { bg: 'rgba(246, 173, 85, 0.25)', border: 'rgba(246, 173, 85, 0.4)', text: '#F6AD55' };
+                case 'TNR':
+                    return { bg: 'rgba(183, 148, 244, 0.25)', border: 'rgba(183, 148, 244, 0.4)', text: '#B794F4' };
+                default:
+                    return { bg: 'rgba(160, 174, 192, 0.25)', border: 'rgba(160, 174, 192, 0.4)', text: '#A0AEC0' };
+            }
+        }
         switch (category) {
             case 'Question':
                 return { bg: '#3F8FF7', border: 'rgba(255,255,255,0.22)', text: '#FFFFFF' };
@@ -173,7 +191,7 @@ export default function CommunityScreen() {
     const openNewPost = () => {
         setNewPostCategory(null);
         setNewPostContent('');
-        setNewPostImageUrl('');
+        setNewPostPhoto(null);
         setNewPostCats([]);
         setNewPostCatDraft('');
         setCatSuggestions([]);
@@ -182,6 +200,22 @@ export default function CommunityScreen() {
 
     const closeNewPost = () => {
         setNewPostOpen(false);
+    };
+
+    const pickPostPhoto = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+        });
+        if (!result.canceled && result.assets[0]) {
+            setNewPostPhoto(result.assets[0]);
+        }
+    };
+
+    const removePostPhoto = () => {
+        setNewPostPhoto(null);
     };
 
     const addCatTag = () => {
@@ -248,7 +282,7 @@ export default function CommunityScreen() {
             comments: 0,
             likedByMe: false,
             commentThread: [],
-            image: newPostImageUrl.trim() || undefined,
+            image: newPostPhoto?.uri || undefined,
             category: newPostCategory,
             cats: cats.length ? cats : undefined,
         };
@@ -436,143 +470,168 @@ export default function CommunityScreen() {
 
             <Modal
                 visible={newPostOpen}
-                transparent
                 animationType="slide"
+                presentationStyle="pageSheet"
                 onRequestClose={closeNewPost}
             >
-                <Pressable style={styles.modalBackdrop} onPress={closeNewPost} />
-                <View style={[styles.modalSheet, { paddingBottom: Math.max(20, insets.bottom + 16) }]}>
-                    <View
-                        style={[
-                            styles.newPostCard,
-                            {
-                                backgroundColor: isDark ? '#171717' : '#FFFFFF',
-                                borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
-                            },
-                        ]}
+                <KeyboardAvoidingView
+                    style={[styles.newPostModalContainer, { backgroundColor: isDark ? Colors.primary.dark : '#FFFFFF' }]}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <ScrollView
+                        contentContainerStyle={[styles.newPostScrollContent, { paddingBottom: insets.bottom + 20 }]}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
                     >
-                        <View style={styles.newPostHeader}>
-                            <Pressable onPress={closeNewPost} style={styles.modalClose}>
-                                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon }}>Cancel</Text>
-                            </Pressable>
-                            <Text style={[styles.modalTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>New Post</Text>
+                        <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                             Badge (choose one)
+                            
+                        </Text>
+                        <View style={styles.newPostCategoryRow}>
+                            {POST_CATEGORIES.map((cat) => {
+                                const s = getCategoryStyle(cat, true);
+                                const selected = cat === newPostCategory;
+                                return (
+                                    <Pressable
+                                        key={cat}
+                                        onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
+                                        style={({ pressed }) => [
+                                            styles.newPostBadgeChip,
+                                            { 
+                                                backgroundColor: s.bg, 
+                                                borderColor: selected ? s.text : s.border,
+                                                borderWidth: selected ? 2 : 1,
+                                            },
+                                            pressed && { opacity: 0.8 },
+                                        ]}
+                                    >
+                                        <Text style={[styles.newPostBadgeText, { color: s.text }]}>{cat}</Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+
+                        <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 20 }]}>
+                            Your post
+                        </Text>
+                        <TextInput
+                            value={newPostContent}
+                            onChangeText={setNewPostContent}
+                            placeholder="Share an update..."
+                            placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
+                            multiline
+                            style={[
+                                styles.newPostContentInput,
+                                {
+                                    color: isDark ? Colors.glass.text : Colors.light.text,
+                                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                    borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+                                },
+                            ]}
+                        />
+
+                        <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 20 }]}>
+                            Tag cats (optional)
+                        </Text>
+                        <View style={styles.newPostCatsWrap}>
+                            {newPostCats.map((name) => (
+                                <Pressable
+                                    key={name}
+                                    onPress={() => removeCatTag(name)}
+                                    style={({ pressed }) => [styles.catPill, pressed && { opacity: 0.85 }]}
+                                >
+                                    <Text style={styles.catPillText}>{name} ✕</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                        <View style={styles.newPostCatInputRow}>
+                            <TextInput
+                                value={newPostCatDraft}
+                                onChangeText={handleCatDraftChange}
+                                placeholder="Search or add a cat name"
+                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
+                                style={[
+                                    styles.newPostSmallInput,
+                                    {
+                                        color: isDark ? Colors.glass.text : Colors.light.text,
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+                                    },
+                                ]}
+                                returnKeyType="done"
+                                onSubmitEditing={addCatTag}
+                            />
                             <Pressable
-                                onPress={submitNewPost}
-                                disabled={!newPostContent.trim() || !newPostCategory}
+                                onPress={addCatTag}
+                                disabled={!newPostCatDraft.trim()}
                                 style={({ pressed }) => [
-                                    styles.newPostSubmit,
-                                    (!newPostContent.trim() || !newPostCategory) && { opacity: 0.4 },
+                                    styles.newPostAddBtn,
+                                    !newPostCatDraft.trim() && { opacity: 0.4 },
                                     pressed && { opacity: 0.85 },
                                 ]}
                             >
-                                <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Post</Text>
+                                <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Add</Text>
                             </Pressable>
                         </View>
-
-                        <View style={styles.newPostBody}>
-                            <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                Badge (choose one)
-                            </Text>
-                            <View style={styles.newPostCategoryRow}>
-                                {POST_CATEGORIES.map((cat) => {
-                                    const s = getCategoryStyle(cat);
-                                    const selected = cat === newPostCategory;
-                                    return (
-                                        <Pressable
-                                            key={cat}
-                                            onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
-                                            style={({ pressed }) => [
-                                                styles.newPostBadgeChip,
-                                                { backgroundColor: s.bg, borderColor: selected ? (isDark ? '#FFFFFF' : '#000000') : 'transparent' },
-                                                pressed && { opacity: 0.9 },
-                                            ]}
-                                        >
-                                            <Text style={styles.newPostBadgeText}>{cat}</Text>
-                                        </Pressable>
-                                    );
-                                })}
-                            </View>
-
-                            <TextInput
-                                value={newPostContent}
-                                onChangeText={setNewPostContent}
-                                placeholder="What’s happening?"
-                                placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
-                                multiline
-                                style={[
-                                    styles.newPostContentInput,
-                                    {
-                                        color: isDark ? Colors.glass.text : Colors.light.text,
-                                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
-                                        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-                                    },
-                                ]}
-                            />
-
-                            <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                Cats (optional)
-                            </Text>
-                            <View style={styles.newPostCatsWrap}>
-                                {newPostCats.map((name) => (
+                        {catSuggestions.length > 0 && (
+                            <View style={[styles.catSuggestions, { backgroundColor: isDark ? 'rgba(40,40,40,0.98)' : '#FFFFFF' }]}>
+                                {catSuggestions.map((cat) => (
                                     <Pressable
-                                        key={name}
-                                        onPress={() => removeCatTag(name)}
-                                        style={({ pressed }) => [styles.catPill, pressed && { opacity: 0.85 }]}
+                                        key={cat.id}
+                                        onPress={() => selectCatSuggestion(cat.name)}
+                                        style={({ pressed }) => [
+                                            styles.catSuggestionItem,
+                                            pressed && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+                                        ]}
                                     >
-                                        <Text style={styles.catPillText}>{name} ✕</Text>
+                                        <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>{cat.name}</Text>
                                     </Pressable>
                                 ))}
                             </View>
-                            <View style={styles.newPostCatInputRow}>
-                                <TextInput
-                                    value={newPostCatDraft}
-                                    onChangeText={handleCatDraftChange}
-                                    placeholder="Search or add a cat name"
-                                    placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)'}
-                                    style={[
-                                        styles.newPostSmallInput,
-                                        {
-                                            color: isDark ? Colors.glass.text : Colors.light.text,
-                                            backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
-                                            borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
-                                        },
-                                    ]}
-                                    returnKeyType="done"
-                                    onSubmitEditing={addCatTag}
-                                />
-                                <Pressable
-                                    onPress={addCatTag}
-                                    disabled={!newPostCatDraft.trim()}
-                                    style={({ pressed }) => [
-                                        styles.newPostAddBtn,
-                                        !newPostCatDraft.trim() && { opacity: 0.4 },
-                                        pressed && { opacity: 0.85 },
-                                    ]}
-                                >
-                                    <Text style={{ color: Colors.primary.blue, fontWeight: '800' }}>Add</Text>
+                        )}
+
+                        <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 20 }]}>
+                            Photo (optional)
+                        </Text>
+                        {newPostPhoto ? (
+                            <View style={styles.newPostPhotoContainer}>
+                                <Image source={{ uri: newPostPhoto.uri }} style={styles.newPostPhotoPreview} />
+                                <Pressable onPress={removePostPhoto} style={styles.newPostPhotoRemove}>
+                                    <SymbolView name="xmark.circle.fill" size={24} tintColor="#FFFFFF" />
                                 </Pressable>
                             </View>
-                            {catSuggestions.length > 0 && (
-                                <View style={[styles.catSuggestions, { backgroundColor: isDark ? 'rgba(40,40,40,0.98)' : '#FFFFFF' }]}>
-                                    {catSuggestions.map((cat) => (
-                                        <Pressable
-                                            key={cat.id}
-                                            onPress={() => selectCatSuggestion(cat.name)}
-                                            style={({ pressed }) => [
-                                                styles.catSuggestionItem,
-                                                pressed && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
-                                            ]}
-                                        >
-                                            <Text style={{ color: isDark ? Colors.glass.text : Colors.light.text }}>{cat.name}</Text>
-                                        </Pressable>
-                                    ))}
-                                </View>
-                            )}
+                        ) : (
+                            <Pressable
+                                onPress={pickPostPhoto}
+                                style={[
+                                    styles.newPostPhotoPickerBox,
+                                    { 
+                                        borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                                    }
+                                ]}
+                            >
+                                <SymbolView name="photo.on.rectangle" size={28} tintColor={isDark ? Colors.glass.textSecondary : Colors.light.icon} />
+                                <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 6 }}>
+                                    Add photo
+                                </Text>
+                            </Pressable>
+                        )}
+                    </ScrollView>
 
-                            
-                        </View>
+                    <View style={[styles.newPostFooter, { paddingBottom: insets.bottom + 16 }]}>
+                        <Pressable
+                            onPress={submitNewPost}
+                            disabled={!newPostContent.trim() || !newPostCategory}
+                            style={[
+                                styles.newPostSubmitButton,
+                                (!newPostContent.trim() || !newPostCategory) && { opacity: 0.4 },
+                            ]}
+                        >
+                            <Text style={styles.newPostSubmitText}>Post</Text>
+                        </Pressable>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             <Modal
@@ -862,43 +921,55 @@ const styles = StyleSheet.create({
         fontSize: 11,
         fontWeight: '700',
     },
-    modalBackdrop: {
+    newPostModalContainer: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.45)',
     },
-    modalSheet: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        padding: 16,
-    },
-    modalCard: {
-        borderRadius: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-    },
-    newPostCard: {
-        borderRadius: 20,
-        overflow: 'hidden',
-        borderWidth: 1,
-    },
-    newPostHeader: {
-        paddingHorizontal: 12,
-        paddingTop: 12,
-        paddingBottom: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    newPostSubmit: {
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-    },
-    newPostBody: {
-        paddingHorizontal: 16,
-        paddingBottom: 14,
+    newPostScrollContent: {
+        paddingHorizontal: 20,
+        paddingTop: 20,
         gap: 10,
+    },
+    newPostFooter: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: 'rgba(128,128,128,0.2)',
+    },
+    newPostSubmitButton: {
+        backgroundColor: Colors.primary.blue,
+        paddingVertical: 16,
+        borderRadius: 14,
+        alignItems: 'center',
+    },
+    newPostSubmitText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    newPostPhotoPickerBox: {
+        height: 100,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderStyle: 'dashed',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    newPostPhotoContainer: {
+        position: 'relative',
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    newPostPhotoPreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: 16,
+    },
+    newPostPhotoRemove: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 12,
     },
     newPostLabel: {
         fontSize: 12,
@@ -917,17 +988,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        height: 34,
-        minWidth: 132,
-        paddingHorizontal: 14,
-        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
         borderWidth: 1.5,
     },
     newPostBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '800',
+        fontSize: 13,
+        fontWeight: '600',
     },
     newPostCategoryRow: {
         flexDirection: 'row',
@@ -1053,5 +1121,21 @@ const styles = StyleSheet.create({
     sendBtn: {
         paddingHorizontal: 10,
         paddingVertical: 8,
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    modalSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+    },
+    modalCard: {
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderWidth: 1,
+        overflow: 'hidden',
     },
 });
