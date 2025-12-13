@@ -73,9 +73,10 @@ function RootLayoutContent() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Handle Protection and Seeding
+  // Handle Protection - Seeding is disabled for production
+  // To enable seeding for development, set EXPO_PUBLIC_AUTO_SEED=true in .env
   const hasSeededRef = useRef(false);
-  const shouldAutoSeed = process.env.EXPO_PUBLIC_AUTO_SEED === 'true' || (__DEV__ && process.env.EXPO_PUBLIC_AUTO_SEED !== 'false');
+  const shouldAutoSeed = process.env.EXPO_PUBLIC_AUTO_SEED === 'true';
 
   useEffect(() => {
     if (!initialized) return;
@@ -86,7 +87,7 @@ function RootLayoutContent() {
 
     if (session) {
       // User is logged in
-      // Only seed when explicitly allowed (or in dev by default)
+      // Only seed when explicitly enabled via EXPO_PUBLIC_AUTO_SEED=true
       if (shouldAutoSeed && !hasSeededRef.current) {
         hasSeededRef.current = true;
         seedDatabase();
@@ -114,7 +115,7 @@ function RootLayoutContent() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'New Sighting', headerShown: true }} />
         <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Add Cat', headerShown: true }} />
-        <Stack.Screen name="clips" options={{ title: 'Cat Clips', headerShown: true }} />
+        <Stack.Screen name="clips/index" options={{ title: 'Cat Clips', headerShown: true }} />
         <Stack.Screen name="clips/record" options={{ title: 'Record Clip', headerShown: true }} />
         <Stack.Screen name="cat/[id]" options={{ title: 'Cat Profile', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="cat/[id]/translate" options={{ title: 'Translator', headerBackTitle: 'Back', headerShown: true }} />

@@ -9,10 +9,10 @@ import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, 
 
 import { supabase } from '@/lib/supabase';
 import placeholderAvatar from '@/userPlaceholder.png';
-import { Session } from '@supabase/supabase-js';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export default function ProfileScreen() {
     const [session, setSession] = useState<Session | null>(null);
@@ -39,6 +39,50 @@ export default function ProfileScreen() {
         };
     }, []));
 
+    // Fetch user's stats from database
+    useEffect(() => {
+        const fetchUserStats = async () => {
+            if (!session?.user?.id) {
+                setClipsCount(0);
+                setSightingsCount(0);
+                setFeedingsCount(0);
+                return;
+            }
+            
+            try {
+                // Fetch clips count
+                const { count: clips } = await supabase
+                    .from('cat_clips')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', session.user.id);
+                
+                if (clips !== null) setClipsCount(clips);
+
+                // Fetch feedings count (cats the user has fed)
+                const { count: feedings } = await supabase
+                    .from('cat_feedings')
+                    .select('*', { count: 'exact', head: true });
+                // Note: cat_feedings doesn't have user_id, so this counts all feedings
+                // TODO: Add user_id to cat_feedings table for per-user tracking
+                
+                if (feedings !== null) setFeedingsCount(feedings);
+
+                // Fetch sightings count (cats added/reported by user)
+                // Using cats table - ideally would have a created_by field
+                const { count: sightings } = await supabase
+                    .from('cats')
+                    .select('*', { count: 'exact', head: true });
+                // Note: cats table doesn't have created_by, so this counts all cats
+                // TODO: Add created_by to cats table for per-user tracking
+                
+                if (sightings !== null) setSightingsCount(sightings);
+            } catch (e) {
+                console.error('Error fetching user stats:', e);
+            }
+        };
+        fetchUserStats();
+    }, [session?.user?.id]);
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         // Navigation will be handled by the onAuthStateChange in _layout.tsx
@@ -47,6 +91,9 @@ export default function ProfileScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [locationEnabled, setLocationEnabled] = useState(false);
     const [darkModeEnabled, setDarkModeEnabled] = useState(preference === 'dark');
+    const [clipsCount, setClipsCount] = useState(0);
+    const [sightingsCount, setSightingsCount] = useState(0);
+    const [feedingsCount, setFeedingsCount] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -114,16 +161,16 @@ export default function ProfileScreen() {
     };
 
     const user = useMemo(() => ({
-        name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'Alex D.',
-        role: 'Community Guardian',
+        name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || '',
+        role: session?.user?.user_metadata?.role || '',
         avatarUri: session?.user?.user_metadata?.avatar_url,
         area: session?.user?.user_metadata?.area,
         stats: {
-            sightings: 42,
-            fed: 156,
-            adopted: 2
+            sightings: sightingsCount,
+            fed: feedingsCount,
+            clips: clipsCount
         }
-    }), [session?.user?.email, session?.user?.user_metadata?.avatar_url, session?.user?.user_metadata?.name, session?.user?.user_metadata?.area]);
+    }), [session?.user?.email, session?.user?.user_metadata?.avatar_url, session?.user?.user_metadata?.name, session?.user?.user_metadata?.area, session?.user?.user_metadata?.role, clipsCount, sightingsCount, feedingsCount]);
 
     const avatarSource = user.avatarUri ? { uri: user.avatarUri } : placeholderAvatar;
 
@@ -192,7 +239,7 @@ export default function ProfileScreen() {
                 <View style={styles.header}>
                     <Image source={avatarSource} style={styles.avatar} />
                     <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.name}</Text>
-                    <Text style={styles.role}>{user.role}</Text>
+                    {!!user.role && <Text style={styles.role}>{user.role}</Text>}
                     <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 5 }}>{session?.user?.email}</Text>
                     {!!user.area && (
                         <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 4 }}>
@@ -202,24 +249,24 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={styles.statsRow}>
-                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
+                    <View style={styles.statColumn}>
+                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
                             <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.sightings}</Text>
-                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Sightings</Text>
-                        </View>
-                    </GlassView>
-                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
+                        </GlassView>
+                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Sightings</Text>
+                    </View>
+                    <View style={styles.statColumn}>
+                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
                             <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.fed}</Text>
-                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Times Fed</Text>
-                        </View>
-                    </GlassView>
-                    <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                        <View style={{ backgroundColor: isDark ? 'transparent' : '#FFFFFF', width: '100%', alignItems: 'center' }}>
-                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.adopted}</Text>
-                            <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Managed</Text>
-                        </View>
-                    </GlassView>
+                        </GlassView>
+                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Times Fed</Text>
+                    </View>
+                    <View style={styles.statColumn}>
+                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
+                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.clips}</Text>
+                        </GlassView>
+                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Clips</Text>
+                    </View>
                 </View>
 
                 <View style={styles.section}>
@@ -331,7 +378,7 @@ const styles = StyleSheet.create({
     },
     role: {
         fontSize: 16,
-        color: Colors.primary.green,
+        color: Colors.primary.blue,
         fontWeight: '600',
     },
     statsRow: {
@@ -341,22 +388,25 @@ const styles = StyleSheet.create({
         marginBottom: 40,
         gap: 12,
     },
-    statCard: {
+    statColumn: {
         flex: 1,
-        // padding: 16, // Moved to inner view
         alignItems: 'center',
+    },
+    statCard: {
+        width: '100%',
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
         borderRadius: 20,
     },
     statNumber: {
         fontSize: 24,
         fontWeight: 'bold',
-        // color: Colors.glass.text,
-        marginBottom: 4,
     },
     statLabel: {
         fontSize: 12,
-        // color: Colors.glass.textSecondary,
         textAlign: 'center',
+        marginTop: 8,
     },
     section: {
         width: '100%',

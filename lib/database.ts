@@ -12,9 +12,13 @@ export type QuickReportPayload = {
     capturedAt?: string;
     rescueFlags?: string[];
     colorTag?: string | null;
+    pattern?: string | null;
+    sex?: string;
+    approximateAge?: string;
     tnrStatus?: boolean;
     status?: string;
     lastFed?: string;
+    needsAttention?: boolean;
 };
 
 // We no longer use expo-sqlite directly for data, but could use it for offline caching if we wanted to get fancy.
@@ -36,8 +40,14 @@ export const addCat = async (
         status?: string;
         tnrStatus?: boolean;
         colorProfile?: string[];
+        primaryColor?: string;
+        pattern?: string;
+        sex?: string;
+        approximateAge?: string;
         rescueFlags?: string[];
         lastFed?: string;
+        needsAttention?: boolean;
+        locationDescription?: string;
     }
 ) => {
     const { error } = await supabase
@@ -53,8 +63,14 @@ export const addCat = async (
             last_sighted: new Date().toISOString(),
             tnr_status: options?.tnrStatus ?? false,
             color_profile: options?.colorProfile ?? [],
+            primary_color: options?.primaryColor ?? null,
+            pattern: options?.pattern ?? null,
+            sex: options?.sex ?? 'unknown',
+            approximate_age: options?.approximateAge ?? 'adult',
             rescue_flags: options?.rescueFlags ?? [],
             last_fed: options?.lastFed,
+            needs_attention: options?.needsAttention ?? false,
+            location_description: options?.locationDescription ?? null,
         });
 
     if (error) console.error('Error adding cat:', error);
@@ -311,6 +327,21 @@ export const seedDatabase = async () => {
 
 export const submitQuickReport = async (payload: QuickReportPayload) => {
     const capturedAt = payload.capturedAt ?? new Date().toISOString();
+    
+    // Upload image to Supabase Storage if it's a local file URI
+    let imageUrl = payload.photoUri ?? '';
+    if (payload.photoUri && (payload.photoUri.startsWith('file://') || payload.photoUri.startsWith('/'))) {
+        console.log('Uploading cat image to Supabase Storage...');
+        const uploadedUrl = await uploadCatImage(payload.photoUri);
+        if (uploadedUrl) {
+            imageUrl = uploadedUrl;
+            console.log('Image uploaded successfully:', uploadedUrl);
+        } else {
+            console.warn('Failed to upload image, storing without photo');
+            imageUrl = '';
+        }
+    }
+    
     if (payload.catId) {
         await updateCat(payload.catId, {
             latitude: payload.latitude,
@@ -320,6 +351,7 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
             locationDescription: payload.locationDescription,
             colorProfile: payload.colorTag ? [payload.colorTag] : undefined,
             status: payload.rescueFlags?.includes('injured') ? 'Needs Help' : undefined,
+            image: imageUrl || undefined,
         });
         return payload.catId;
     }
@@ -327,15 +359,21 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
     await addCat(
         payload.draftName ?? 'Unknown cat',
         payload.description ?? '',
-        payload.photoUri ?? '',
+        imageUrl,
         payload.latitude,
         payload.longitude,
         {
             status: payload.status ?? 'Healthy',
             tnrStatus: payload.tnrStatus,
             colorProfile: payload.colorTag ? [payload.colorTag] : [],
+            primaryColor: payload.colorTag ?? undefined,
+            pattern: payload.pattern ?? undefined,
+            sex: payload.sex,
+            approximateAge: payload.approximateAge,
             rescueFlags: payload.rescueFlags,
             lastFed: payload.lastFed,
+            needsAttention: payload.needsAttention,
+            locationDescription: payload.locationDescription,
         }
     );
     return null;
