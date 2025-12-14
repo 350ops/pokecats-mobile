@@ -1,13 +1,19 @@
-import 'react-native-get-random-values';
 import { supabase } from '@/lib/supabase';
-import * as FileSystem from 'expo-file-system';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { Audio } from 'expo-av';
-import { v4 as uuidv4 } from 'uuid';
+import 'react-native-get-random-values';
 
 const VIDEO_BUCKET = 'cat_videos';
 const THUMB_BUCKET = 'cat_thumbnails';
 const MAX_DURATION_SECONDS = 20;
+
+// Generate a simple UUID without external dependency
+function generateUUID(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
 
 type UploadArgs = {
     localVideoUri: string;
@@ -23,32 +29,69 @@ export async function uploadCatClip({ localVideoUri, onProgress, durationSeconds
         throw new Error('You must be signed in to upload.');
     }
 
-    const clipId = uuidv4();
+    const clipId = generateUUID();
     const videoPath = `${userId}/${clipId}.mp4`;
     const thumbPath = `${userId}/${clipId}.jpg`;
 
-    const duration = durationSeconds ?? (await probeDurationSeconds(localVideoUri));
+    if (onProgress) onProgress(0.1);
+
+    // Use provided duration or default to MAX if missing (since we removed probing)
+    const duration = durationSeconds ?? MAX_DURATION_SECONDS;
+
+    if (onProgress) onProgress(0.2);
+
+    // Generate thumbnail
     const thumbResult = await VideoThumbnails.getThumbnailAsync(localVideoUri, { time: 1000 });
 
-    const { data: videoSigned, error: videoSignedError } = await supabase.storage
+    if (onProgress) onProgress(0.3);
+
+    // Read video file as Blob
+    console.log('📹 Reading video file as Blob...');
+    const videoResponse = await fetch(localVideoUri);
+    const videoBlob = await videoResponse.blob();
+    console.log('📹 Video blob created, size:', videoBlob.size);
+
+    if (onProgress) onProgress(0.5);
+
+    // Upload video directly to Supabase storage
+    console.log('⬆️ Uploading video to Supabase...');
+    const { error: videoUploadError } = await supabase.storage
         .from(VIDEO_BUCKET)
-        .createSignedUploadUrl(videoPath);
-    if (videoSignedError || !videoSigned?.signedUrl) {
-        throw videoSignedError ?? new Error('Could not create signed upload URL for video.');
-    }
+        .upload(videoPath, videoBlob, {
+            contentType: 'video/mp4',
+            upsert: true,
+        });
 
-    const { data: thumbSigned, error: thumbSignedError } = await supabase.storage
+    if (videoUploadError) {
+        console.error('❌ Video upload error:', videoUploadError);
+        throw videoUploadError;
+    }
+    console.log('✅ Video uploaded successfully');
+
+    if (onProgress) onProgress(0.7);
+
+    // Read and upload thumbnail
+    console.log('🖼️ Reading thumbnail as Blob...');
+    const thumbResponse = await fetch(thumbResult.uri);
+    const thumbBlob = await thumbResponse.blob();
+
+    console.log('⬆️ Uploading thumbnail to Supabase...');
+    const { error: thumbUploadError } = await supabase.storage
         .from(THUMB_BUCKET)
-        .createSignedUploadUrl(thumbPath);
-    if (thumbSignedError || !thumbSigned?.signedUrl) {
-        throw thumbSignedError ?? new Error('Could not create signed upload URL for thumbnail.');
+        .upload(thumbPath, thumbBlob, {
+            contentType: 'image/jpeg',
+            upsert: true,
+        });
+
+    if (thumbUploadError) {
+        console.error('❌ Thumbnail upload error:', thumbUploadError);
+        throw thumbUploadError;
     }
+    console.log('✅ Thumbnail uploaded successfully');
 
-    if (onProgress) onProgress(0);
-    await uploadWithProgress(localVideoUri, videoSigned.signedUrl, 'video/mp4', onProgress);
-    await uploadWithProgress(thumbResult.uri, thumbSigned.signedUrl, 'image/jpeg');
-    if (onProgress) onProgress(1);
+    if (onProgress) onProgress(0.9);
 
+    // Insert record into database
     const { error: insertError } = await supabase.from('cat_clips').insert({
         id: clipId,
         user_id: userId,
@@ -56,57 +99,14 @@ export async function uploadCatClip({ localVideoUri, onProgress, durationSeconds
         thumbnail_path: thumbPath,
         duration: Math.min(duration, MAX_DURATION_SECONDS),
     });
-    if (insertError) throw insertError;
+
+    if (insertError) {
+        console.error('❌ Database insert error:', insertError);
+        throw insertError;
+    }
+
+    console.log('✅ Clip record saved to database');
+    if (onProgress) onProgress(1);
 
     return clipId;
-}
-
-async function uploadWithProgress(
-    fileUri: string,
-    signedUrl: string,
-    contentType: string,
-    onProgress?: (progress: number) => void
-) {
-    const resumable = FileSystem.createUploadResumable(
-        signedUrl,
-        fileUri,
-        {
-            httpMethod: 'PUT',
-            uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-            headers: {
-                'Content-Type': contentType,
-            },
-        },
-        onProgress
-            ? (progressData) => {
-                if (progressData.totalBytesExpectedToSend) {
-                    onProgress(progressData.totalBytesSent / progressData.totalBytesExpectedToSend);
-                }
-            }
-            : undefined
-    );
-
-    const result = await resumable.uploadAsync();
-    if (!result || result.status < 200 || result.status >= 300) {
-        throw new Error(`Upload failed (${result?.status ?? 'unknown status'})`);
-    }
-}
-
-async function probeDurationSeconds(uri: string): Promise<number> {
-    try {
-        const { sound, status } = await Audio.Sound.createAsync(
-            { uri },
-            { shouldPlay: false },
-            undefined,
-            false
-        );
-        const millis = (status as any)?.durationMillis;
-        await sound.unloadAsync();
-        if (typeof millis === 'number') {
-            return Math.min(MAX_DURATION_SECONDS, Math.max(1, Math.round(millis / 1000)));
-        }
-    } catch (error) {
-        console.warn('Failed to probe duration', error);
-    }
-    return MAX_DURATION_SECONDS;
 }

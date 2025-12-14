@@ -50,30 +50,41 @@ export const addCat = async (
         locationDescription?: string;
     }
 ) => {
-    const { error } = await supabase
+    console.log('🐱 Adding cat with image:', image ? `${image.substring(0, 50)}...` : 'NO IMAGE');
+    
+    const insertData = {
+        name,
+        description,
+        image: image || null, // Ensure we save null instead of empty string if no image
+        latitude,
+        longitude,
+        status: options?.status ?? 'Healthy',
+        breed: 'Unknown',
+        last_sighted: new Date().toISOString(),
+        tnr_status: options?.tnrStatus ?? false,
+        color_profile: options?.colorProfile ?? [],
+        primary_color: options?.primaryColor ?? null,
+        pattern: options?.pattern ?? null,
+        sex: options?.sex ?? 'unknown',
+        approximate_age: options?.approximateAge ?? 'adult',
+        rescue_flags: options?.rescueFlags ?? [],
+        last_fed: options?.lastFed,
+        needs_attention: options?.needsAttention ?? false,
+        location_description: options?.locationDescription ?? null,
+    };
+    
+    console.log('📝 Insert data (image field):', insertData.image ? 'HAS IMAGE' : 'NO IMAGE');
+    
+    const { error, data } = await supabase
         .from('cats')
-        .insert({
-            name,
-            description,
-            image,
-            latitude,
-            longitude,
-            status: options?.status ?? 'Healthy',
-            breed: 'Unknown',
-            last_sighted: new Date().toISOString(),
-            tnr_status: options?.tnrStatus ?? false,
-            color_profile: options?.colorProfile ?? [],
-            primary_color: options?.primaryColor ?? null,
-            pattern: options?.pattern ?? null,
-            sex: options?.sex ?? 'unknown',
-            approximate_age: options?.approximateAge ?? 'adult',
-            rescue_flags: options?.rescueFlags ?? [],
-            last_fed: options?.lastFed,
-            needs_attention: options?.needsAttention ?? false,
-            location_description: options?.locationDescription ?? null,
-        });
+        .insert(insertData)
+        .select();
 
-    if (error) console.error('Error adding cat:', error);
+    if (error) {
+        console.error('❌ Error adding cat:', error);
+    } else {
+        console.log('✅ Cat added successfully:', data);
+    }
 };
 
 import { decode } from 'base64-arraybuffer';
@@ -103,23 +114,39 @@ export const updateCat = async (id: number, updates: { latitude?: number; longit
 
 export const uploadCatImage = async (uri: string): Promise<string | null> => {
     try {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-        const filePath = `cat_${Date.now()}.jpg`;
+        console.log('📷 Reading image from URI:', uri);
+        
+        // Handle different URI formats
+        let fileUri = uri;
+        
+        // For expo-image-picker, the URI should already be a file:// URI
+        // But we need to make sure it's readable
+        if (!fileUri.startsWith('file://') && !fileUri.startsWith('/')) {
+            console.warn('⚠️ Unexpected URI format:', fileUri);
+        }
+        
+        const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: 'base64' });
+        console.log('📦 Image read successfully, base64 length:', base64.length);
+        
+        const filePath = `cat_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
         const contentType = 'image/jpeg';
 
+        console.log('⬆️ Uploading to Supabase Storage, path:', filePath);
         const { data, error } = await supabase.storage
             .from('cat-photos')
-            .upload(filePath, decode(base64), { contentType });
+            .upload(filePath, decode(base64), { contentType, upsert: true });
 
         if (error) {
-            console.error('Upload Error:', error);
+            console.error('❌ Upload Error:', error);
             return null;
         }
 
+        console.log('✅ Upload successful:', data);
         const { data: publicData } = supabase.storage.from('cat-photos').getPublicUrl(filePath);
+        console.log('🔗 Public URL:', publicData.publicUrl);
         return publicData.publicUrl;
     } catch (e) {
-        console.error('FileSystem Error:', e);
+        console.error('❌ FileSystem Error:', e);
         return null;
     }
 };
@@ -147,31 +174,14 @@ export const getCat = async (id: number) => {
         colorProfile: data.color_profile ?? [],
         locationDescription: data.location_description,
         tnrStatus: data.tnr_status ?? false,
+        primaryColor: data.primary_color ?? null,
+        pattern: data.pattern ?? null,
+        sex: data.sex ?? 'unknown',
+        approximateAge: data.approximate_age ?? null,
+        needsAttention: data.needs_attention ?? false,
     };
 };
 
-export const addTranslation = async (catId: number, translation: string, sentiment: string) => {
-    const { error } = await supabase
-        .from('cat_translations')
-        .insert({ cat_id: catId, translation, sentiment });
-
-    if (error) console.error('Error adding translation:', error);
-};
-
-export const getTranslationHistory = async (catId: number) => {
-    const { data, error } = await supabase
-        .from('cat_translations')
-        .select('*')
-        .eq('cat_id', catId)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-    if (error) {
-        console.error('Error getting translation history:', error);
-        return [];
-    }
-    return data;
-};
 
 export const getCats = async () => {
     const { data, error } = await supabase
@@ -195,6 +205,11 @@ export const getCats = async () => {
         colorProfile: cat.color_profile ?? [],
         locationDescription: cat.location_description,
         tnrStatus: cat.tnr_status ?? false,
+        primaryColor: cat.primary_color ?? null,
+        pattern: cat.pattern ?? null,
+        sex: cat.sex ?? 'unknown',
+        approximateAge: cat.approximate_age ?? null,
+        needsAttention: cat.needs_attention ?? false,
     }));
 };
 
@@ -330,16 +345,20 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
     
     // Upload image to Supabase Storage if it's a local file URI
     let imageUrl = payload.photoUri ?? '';
-    if (payload.photoUri && (payload.photoUri.startsWith('file://') || payload.photoUri.startsWith('/'))) {
-        console.log('Uploading cat image to Supabase Storage...');
+    console.log('📸 Photo URI received:', payload.photoUri);
+    
+    if (payload.photoUri && (payload.photoUri.startsWith('file://') || payload.photoUri.startsWith('/') || payload.photoUri.startsWith('ph://'))) {
+        console.log('📤 Uploading cat image to Supabase Storage...');
         const uploadedUrl = await uploadCatImage(payload.photoUri);
         if (uploadedUrl) {
             imageUrl = uploadedUrl;
-            console.log('Image uploaded successfully:', uploadedUrl);
+            console.log('✅ Image uploaded successfully:', uploadedUrl);
         } else {
-            console.warn('Failed to upload image, storing without photo');
+            console.warn('❌ Failed to upload image, storing without photo');
             imageUrl = '';
         }
+    } else if (payload.photoUri) {
+        console.log('🔗 Using existing URL as image:', payload.photoUri);
     }
     
     if (payload.catId) {

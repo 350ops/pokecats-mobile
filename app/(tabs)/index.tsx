@@ -1,4 +1,6 @@
 import { GlassView } from '@/components/ui/GlassView';
+import { NativeGlassIconButton } from '@/components/ui/NativeGlassIconButton';
+import { getColorLabel, getPatternLabel } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { getCatStatusState } from '@/lib/cat_logic';
@@ -30,6 +32,11 @@ type MapCat = {
     rescueFlags?: string[];
     colorProfile?: string[];
     tnrStatus?: boolean;
+    primaryColor?: string | null;
+    pattern?: string | null;
+    sex?: string;
+    approximateAge?: string | null;
+    needsAttention?: boolean;
 };
 
 type SymbolName = ComponentProps<typeof SymbolView>['name'];
@@ -294,7 +301,7 @@ export default function MapScreen() {
                     <Pressable onPress={() => router.push(`/cat/${item.id}`)} style={{ flex: 1 }}>
                         <View style={styles.cardHeader}>
                             <Image
-                                source={item.image ? { uri: item.image } : CAT_FALLBACK}
+                                source={item.image && item.image.startsWith('http') ? { uri: item.image } : CAT_FALLBACK}
                                 style={styles.avatar}
                             />
                             <View style={{ flex: 1 }}>
@@ -313,7 +320,7 @@ export default function MapScreen() {
                                     </View>
                                 </View>
                                 <Text style={[styles.catBreed, { color: secondaryTextColor }]} numberOfLines={1}>
-                                    {item.breed ?? 'Unknown'}
+                                    {formatCatAppearance(item)}
                                 </Text>
                             </View>
                         </View>
@@ -431,7 +438,7 @@ export default function MapScreen() {
                                 { borderColor: statusState.markerColor }
                             ]}>
                                 <Image
-                                    source={cat.image ? { uri: cat.image } : CAT_FALLBACK}
+                                    source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CAT_FALLBACK}
                                     style={styles.markerImage}
                                 />
                             </View>
@@ -445,24 +452,20 @@ export default function MapScreen() {
             </GlassView>
 
             <View style={[styles.topRightButtons, { top: insets.top + 12 }]}>
-                <GlassView style={styles.topRightButton} intensity={70}>
-                    <Pressable
-                        onPress={() => router.push('/discover')}
-                        accessibilityLabel="Browse cats"
-                        style={styles.topRightButtonInner}
-                    >
-                        <SymbolView name="line.3.horizontal" size={22} tintColor={primaryTextColor} />
-                    </Pressable>
-                </GlassView>
-                <GlassView style={styles.topRightButton} intensity={70}>
-                    <Pressable
-                        onPress={() => router.push('/report')}
-                        accessibilityLabel="Add cat"
-                        style={styles.topRightButtonInner}
-                    >
-                        <SymbolView name="plus" size={24} tintColor={primaryTextColor} />
-                    </Pressable>
-                </GlassView>
+                <NativeGlassIconButton
+                    icon="line.3.horizontal"
+                    size={44}
+                    iconSize={22}
+                    onPress={() => router.push('/discover')}
+                    accessibilityLabel="Browse cats"
+                />
+                <NativeGlassIconButton
+                    icon="plus"
+                    size={44}
+                    iconSize={24}
+                    onPress={() => router.push('/report')}
+                    accessibilityLabel="Add cat"
+                />
             </View>
 
             {!filteredCats.length && (
@@ -555,6 +558,27 @@ const StatRow = ({
         <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
     </View>
 );
+
+const formatCatAppearance = (cat: MapCat): string => {
+    const parts: string[] = [];
+    
+    if (cat.primaryColor) {
+        parts.push(getColorLabel(cat.primaryColor));
+    }
+    if (cat.pattern && cat.pattern !== 'unknown') {
+        parts.push(getPatternLabel(cat.pattern));
+    }
+    
+    if (parts.length === 0) {
+        // Fallback to sex if no appearance info
+        if (cat.sex && cat.sex !== 'unknown') {
+            return cat.sex.charAt(0).toUpperCase() + cat.sex.slice(1);
+        }
+        return 'Unknown';
+    }
+    
+    return parts.join(' • ');
+};
 
 const getTimeAgo = (dateValue?: string | Date | null) => {
     if (!dateValue) return 'Unknown';

@@ -1,5 +1,6 @@
 import { CatCard } from '@/components/CatCard';
 import { GlassView } from '@/components/ui/GlassView';
+import { NativeGlassIconButton } from '@/components/ui/NativeGlassIconButton';
 import { Colors } from '@/constants/Colors';
 import { Cat } from '@/constants/MockData';
 import { useTheme } from '@/context/ThemeContext';
@@ -14,6 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type NormalizedCat = Cat & {
     rescueFlags?: string[];
     colorProfile?: string[];
+    primaryColor?: string | null;
+    pattern?: string | null;
+    sex?: string;
 };
 
 type SortOption = {
@@ -195,23 +199,35 @@ export default function DiscoverScreen() {
     return (
         <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <GlassView style={styles.headerButton} intensity={70}>
-                    <Pressable onPress={() => router.back()} style={styles.headerButtonInner}>
-                        <SymbolView name="chevron.left" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={22} />
-                    </Pressable>
-                </GlassView>
+                {/* Back Button - Native Liquid Glass */}
+                <NativeGlassIconButton
+                    icon="chevron.left"
+                    size={44}
+                    iconSize={22}
+                    onPress={() => router.back()}
+                    accessibilityLabel="Back"
+                />
 
                 <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Nearby Cats</Text>
 
-                <GlassView style={styles.headerButtonGroup} intensity={70}>
-                    <Pressable onPress={() => router.push('/report')} style={styles.headerGroupButton}>
-                        <SymbolView name="plus" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
-                    </Pressable>
-                    <View style={[styles.headerButtonDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }]} />
-                    <Pressable onPress={handleSortPress} style={styles.headerGroupButton}>
-                        <SymbolView name="ellipsis" tintColor={isDark ? Colors.glass.text : Colors.light.text} size={20} />
-                    </Pressable>
-                </GlassView>
+                {/* Action Buttons - Native Liquid Glass */}
+                <View style={styles.headerButtonGroup}>
+                    <NativeGlassIconButton
+                        icon="plus"
+                        size={44}
+                        iconSize={20}
+                        onPress={() => router.push('/report')}
+                        accessibilityLabel="Add Cat"
+                    />
+                    <NativeGlassIconButton
+                        icon="ellipsis"
+                        size={44}
+                        iconSize={20}
+                        onPress={handleSortPress}
+                        accessibilityLabel="Sort Options"
+                        style={{ marginLeft: 8 }}
+                    />
+                </View>
             </View>
 
             <View style={styles.filterRow}>
@@ -325,11 +341,26 @@ const SortSheet = ({
 
 const normalizeCat = (cat: any): NormalizedCat => {
     const distanceMeters = computeDistanceMeters(cat);
+    const primaryColor = cat.primaryColor ?? cat.primary_color ?? null;
+    const pattern = cat.pattern ?? null;
+    const sex = cat.sex ?? 'unknown';
+    
+    // Format breed/appearance from color and pattern
+    let breed = cat.breed ?? 'Mixed';
+    if (primaryColor) {
+        const colorLabel = primaryColor.charAt(0).toUpperCase() + primaryColor.slice(1);
+        breed = pattern && pattern !== 'unknown' 
+            ? `${colorLabel} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`
+            : colorLabel;
+    } else if (sex && sex !== 'unknown') {
+        breed = sex.charAt(0).toUpperCase() + sex.slice(1);
+    }
+    
     return {
         id: String(cat.id ?? cat.name ?? Math.random()),
         name: cat.name ?? 'Unnamed cat',
         image: cat.image ?? 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=600&q=80',
-        breed: cat.breed ?? 'Mixed',
+        breed,
         distance: formatDistanceFromMeters(distanceMeters),
         status: (cat.status ?? 'Healthy') as NormalizedCat['status'],
         description: cat.description ?? '',
@@ -342,6 +373,9 @@ const normalizeCat = (cat: any): NormalizedCat => {
         adoptionStatus: cat.adoptionStatus ?? null,
         rescueFlags: cat.rescueFlags ?? cat.rescue_flags ?? [],
         colorProfile: cat.colorProfile ?? cat.color_profile ?? [],
+        primaryColor,
+        pattern,
+        sex,
     };
 };
 

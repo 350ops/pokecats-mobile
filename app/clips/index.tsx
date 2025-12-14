@@ -1,5 +1,6 @@
 import { ClipFeed } from '@/components/ClipFeed';
 import { GlassButton } from '@/components/ui/GlassButton';
+import { NativeGlassIconButton } from '@/components/ui/NativeGlassIconButton';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { useRouter } from 'expo-router';
@@ -14,11 +15,13 @@ export default function CatClipsScreen() {
     return (
         <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <GlassButton
+                {/* Back Button - Native Liquid Glass */}
+                <NativeGlassIconButton
                     icon="chevron.left"
-                    variant="glass"
-                    accessibilityLabel="Back"
+                    size={44}
+                    iconSize={22}
                     onPress={() => router.back()}
+                    accessibilityLabel="Back"
                     style={styles.backButton}
                 />
                 <Text style={[styles.title, { color: isDark ? Colors.glass.text : Colors.primary.dark }]}>Cat Clips</Text>

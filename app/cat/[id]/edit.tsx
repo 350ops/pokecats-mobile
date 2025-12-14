@@ -130,8 +130,9 @@ export default function EditCatScreen() {
                     <Switch
                         value={tnrStatus}
                         onValueChange={setTnrStatus}
-                        trackColor={{ false: '#767577', true: Colors.primary.green }}
-                        thumbColor={'#fff'}
+                        trackColor={{ false: '#767577', true: Colors.primary.blue }}
+                        thumbColor={Colors.primary.blue}
+                        ios_backgroundColor={Colors.primary.dark}
                     />
                 </View>
 

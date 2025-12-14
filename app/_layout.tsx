@@ -118,7 +118,6 @@ function RootLayoutContent() {
         <Stack.Screen name="clips/index" options={{ title: 'Cat Clips', headerShown: true }} />
         <Stack.Screen name="clips/record" options={{ title: 'Record Clip', headerShown: true }} />
         <Stack.Screen name="cat/[id]" options={{ title: 'Cat Profile', headerBackTitle: 'Back', headerShown: true }} />
-        <Stack.Screen name="cat/[id]/translate" options={{ title: 'Translator', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="update" options={{ title: 'Update Cat', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="profile/edit" options={{ title: 'Edit Profile', headerBackTitle: 'Back', headerShown: true }} />
       </Stack>

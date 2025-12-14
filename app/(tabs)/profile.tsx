@@ -1,5 +1,5 @@
 import { GlassButton } from '@/components/ui/GlassButton';
-import { GlassView } from '@/components/ui/GlassView';
+import { StatCard } from '@/components/ui/StatCard';
 import { VisionOSInlineMenu, type MenuSection } from '@/components/ui/VisionOSMenu';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
@@ -48,14 +48,14 @@ export default function ProfileScreen() {
                 setFeedingsCount(0);
                 return;
             }
-            
+
             try {
                 // Fetch clips count
                 const { count: clips } = await supabase
                     .from('cat_clips')
                     .select('*', { count: 'exact', head: true })
                     .eq('user_id', session.user.id);
-                
+
                 if (clips !== null) setClipsCount(clips);
 
                 // Fetch feedings count (cats the user has fed)
@@ -64,7 +64,7 @@ export default function ProfileScreen() {
                     .select('*', { count: 'exact', head: true });
                 // Note: cat_feedings doesn't have user_id, so this counts all feedings
                 // TODO: Add user_id to cat_feedings table for per-user tracking
-                
+
                 if (feedings !== null) setFeedingsCount(feedings);
 
                 // Fetch sightings count (cats added/reported by user)
@@ -74,7 +74,7 @@ export default function ProfileScreen() {
                     .select('*', { count: 'exact', head: true });
                 // Note: cats table doesn't have created_by, so this counts all cats
                 // TODO: Add created_by to cats table for per-user tracking
-                
+
                 if (sightings !== null) setSightingsCount(sightings);
             } catch (e) {
                 console.error('Error fetching user stats:', e);
@@ -250,22 +250,25 @@ export default function ProfileScreen() {
 
                 <View style={styles.statsRow}>
                     <View style={styles.statColumn}>
-                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.sightings}</Text>
-                        </GlassView>
-                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Sightings</Text>
+                        <StatCard
+                            value={user.stats.sightings}
+                            label="Sightings"
+                            gradientColors={['#2a69df', '#4dc7ff']}
+                        />
                     </View>
                     <View style={styles.statColumn}>
-                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.fed}</Text>
-                        </GlassView>
-                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Times Fed</Text>
+                        <StatCard
+                            value={user.stats.fed}
+                            label="Times Fed"
+                            gradientColors={['#d8a700', '#f8c109']}
+                        />
                     </View>
                     <View style={styles.statColumn}>
-                        <GlassView style={styles.statCard} intensity={isDark ? 20 : 0}>
-                            <Text style={[styles.statNumber, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.stats.clips}</Text>
-                        </GlassView>
-                        <Text style={[styles.statLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Clips</Text>
+                        <StatCard
+                            value={user.stats.clips}
+                            label="Clips"
+                            gradientColors={['#af4397', '#cf4485']}
+                        />
                     </View>
                 </View>
 

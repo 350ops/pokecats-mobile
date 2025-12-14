@@ -37,6 +37,7 @@ type DistanceMeta = {
 const CheckmarkIcon = require('@/assets/images/Checkmark.png');
 const ExclamationIcon = require('@/assets/images/Exclamation.png');
 const ShieldIcon = require('@/assets/images/Shield.png');
+const CatPlaceholder = require('@/assets/images/cat-placeholder.jpg');
 
 export function CatCard({ cat }: CatCardProps) {
     const { isDark } = useTheme();
@@ -56,7 +57,10 @@ export function CatCard({ cat }: CatCardProps) {
             intensity={isDark ? 50 : 0}
         >
             <View style={styles.imageWrapper}>
-                <Image source={{ uri: cat.image }} style={styles.image} />
+                <Image 
+                    source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CatPlaceholder} 
+                    style={styles.image} 
+                />
                 <View style={styles.statusIcons}>
                     <Image source={needsHelp ? ExclamationIcon : CheckmarkIcon} style={styles.statusIcon} />
                     {isTnrd && <Image source={ShieldIcon} style={styles.statusIcon} />}
