@@ -1,14 +1,106 @@
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { addClipComment, EnrichedClip, fetchClipPage, toggleClipLike } from '@/lib/catClips';
-import { ResizeMode, Video } from 'expo-av';
 import { useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PAGE_SIZE = 8;
+
+// Extracted Component for Individual Clip Card
+function ClipCard({
+    item,
+    onLike,
+    onSubmitComment,
+    isSubmittingComment,
+    commentDraft,
+    onCommentChange
+}: {
+    item: EnrichedClip;
+    onLike: (id: string, liked: boolean) => void;
+    onSubmitComment: (id: string) => void;
+    isSubmittingComment: boolean;
+    commentDraft: string;
+    onCommentChange: (text: string) => void;
+}) {
+    const { isDark } = useTheme();
+    const textColor = isDark ? Colors.glass.text : Colors.primary.dark;
+    const subTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
+    const cardSurface = isDark ? Colors.glass.background : '#f5f7fb';
+
+    const player = useVideoPlayer(item.videoUrl ?? '', player => {
+        player.loop = true;
+        // Auto-play could be added here if desired, or handled via visibility
+        // player.play(); 
+    });
+
+    return (
+        <View style={[styles.card, { backgroundColor: cardSurface }]}>
+            {item.videoUrl ? (
+                <View style={styles.videoContainer}>
+                    <VideoView
+                        player={player}
+                        style={styles.video}
+                        nativeControls={true}
+                        contentFit="cover"
+                    />
+                </View>
+            ) : (
+                <View style={[styles.video, styles.videoFallback]}>
+                    <Text style={{ color: subTextColor }}>Unable to load clip</Text>
+                </View>
+            )}
+            <View style={styles.cardContent}>
+                <View style={styles.row}>
+                    <Text style={[styles.title, { color: textColor }]}>Clip</Text>
+                    <Text style={[styles.meta, { color: subTextColor }]}>{item.duration}s • {new Date(item.created_at).toLocaleString()}</Text>
+                </View>
+
+                <View style={styles.actions}>
+                    <Pressable
+                        style={styles.actionChip}
+                        onPress={() => onLike(item.id, !item.likedByMe)}
+                    >
+                        <SymbolView
+                            name={item.likedByMe ? 'heart.fill' : 'heart'}
+                            size={18}
+                            tintColor={item.likedByMe ? '#FF6B6B' : subTextColor}
+                        />
+                        <Text style={[styles.actionText, { color: textColor }]}>{item.likeCount}</Text>
+                    </Pressable>
+                    <View style={styles.actionChip}>
+                        <SymbolView name="text.bubble" size={18} tintColor={subTextColor} />
+                        <Text style={[styles.actionText, { color: textColor }]}>{item.commentCount}</Text>
+                    </View>
+                </View>
+
+                <View style={styles.commentRow}>
+                    <TextInput
+                        placeholder="Add a comment"
+                        placeholderTextColor={subTextColor}
+                        style={[styles.commentInput, { color: textColor, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}
+                        value={commentDraft}
+                        onChangeText={onCommentChange}
+                    />
+                    <Pressable
+                        style={styles.sendButton}
+                        onPress={() => onSubmitComment(item.id)}
+                        disabled={isSubmittingComment}
+                    >
+                        {isSubmittingComment ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <SymbolView name="paperplane.fill" size={16} tintColor="#fff" />
+                        )}
+                    </Pressable>
+                </View>
+            </View>
+        </View>
+    );
+}
 
 export function ClipFeed() {
     const { isDark } = useTheme();
@@ -21,7 +113,7 @@ export function ClipFeed() {
     const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
     const [submittingCommentIds, setSubmittingCommentIds] = useState<Set<string>>(new Set());
 
-    // Refs to avoid recreating callbacks (which was causing useFocusEffect loops).
+    // Refs to avoid recreating callbacks
     const clipsCountRef = useRef(0);
     const loadingRef = useRef(false);
     const loadingMoreRef = useRef(false);
@@ -45,9 +137,7 @@ export function ClipFeed() {
         schemaMissingRef.current = schemaMissing;
     }, [schemaMissing]);
 
-    const textColor = isDark ? Colors.glass.text : Colors.primary.dark;
     const subTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-    const cardSurface = isDark ? Colors.glass.background : '#f5f7fb';
 
     const loadPage = useCallback(async (reset = false) => {
         if (schemaMissingRef.current) return;
@@ -74,8 +164,6 @@ export function ClipFeed() {
             const message = error?.message ?? error?.error?.message ?? 'Please try again.';
             console.error(error);
 
-            // Supabase PostgREST "schema cache" / missing table error.
-            // Stop retrying and show a single, actionable message.
             if (code === 'PGRST205' || String(message).includes('schema cache')) {
                 setSchemaMissing(true);
                 setEndReached(true);
@@ -162,70 +250,17 @@ export function ClipFeed() {
     }, [commentDrafts]);
 
     const renderItem = useCallback(({ item }: { item: EnrichedClip }) => {
-        const isSubmitting = submittingCommentIds.has(item.id);
         return (
-            <View style={[styles.card, { backgroundColor: cardSurface }]}>
-                {item.videoUrl ? (
-                    <Video
-                        source={{ uri: item.videoUrl }}
-                        style={styles.video}
-                        useNativeControls
-                        resizeMode={ResizeMode.COVER}
-                        posterSource={item.thumbnailUrl ? { uri: item.thumbnailUrl } : undefined}
-                    />
-                ) : (
-                    <View style={[styles.video, styles.videoFallback]}>
-                        <Text style={{ color: subTextColor }}>Unable to load clip</Text>
-                    </View>
-                )}
-                <View style={styles.cardContent}>
-                    <View style={styles.row}>
-                        <Text style={[styles.title, { color: textColor }]}>Clip</Text>
-                        <Text style={[styles.meta, { color: subTextColor }]}>{item.duration}s • {new Date(item.created_at).toLocaleString()}</Text>
-                    </View>
-
-                    <View style={styles.actions}>
-                        <Pressable
-                            style={styles.actionChip}
-                            onPress={() => handleLike(item.id, !item.likedByMe)}
-                        >
-                            <SymbolView
-                                name={item.likedByMe ? 'heart.fill' : 'heart'}
-                                size={18}
-                                tintColor={item.likedByMe ? '#FF6B6B' : subTextColor}
-                            />
-                            <Text style={[styles.actionText, { color: textColor }]}>{item.likeCount}</Text>
-                        </Pressable>
-                        <View style={styles.actionChip}>
-                            <SymbolView name="text.bubble" size={18} tintColor={subTextColor} />
-                            <Text style={[styles.actionText, { color: textColor }]}>{item.commentCount}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.commentRow}>
-                        <TextInput
-                            placeholder="Add a comment"
-                            placeholderTextColor={subTextColor}
-                            style={[styles.commentInput, { color: textColor, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}
-                            value={commentDrafts[item.id] ?? ''}
-                            onChangeText={(text) => setCommentDrafts((prev) => ({ ...prev, [item.id]: text }))}
-                        />
-                        <Pressable
-                            style={styles.sendButton}
-                            onPress={() => handleSubmitComment(item.id)}
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? (
-                                <ActivityIndicator size="small" color="#fff" />
-                            ) : (
-                                <SymbolView name="paperplane.fill" size={16} tintColor="#fff" />
-                            )}
-                        </Pressable>
-                    </View>
-                </View>
-            </View>
+            <ClipCard
+                item={item}
+                onLike={handleLike}
+                onSubmitComment={handleSubmitComment}
+                isSubmittingComment={submittingCommentIds.has(item.id)}
+                commentDraft={commentDrafts[item.id] ?? ''}
+                onCommentChange={(text) => setCommentDrafts((prev) => ({ ...prev, [item.id]: text }))}
+            />
         );
-    }, [cardSurface, commentDrafts, handleLike, handleSubmitComment, isDark, subTextColor, submittingCommentIds, textColor]);
+    }, [handleLike, handleSubmitComment, submittingCommentIds, commentDrafts]);
 
     const listFooter = useMemo(() => {
         if (schemaMissing) {
@@ -276,12 +311,19 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.06)',
     },
-    video: {
+    videoContainer: {
         width: '100%',
         aspectRatio: 16 / 9,
         backgroundColor: '#000',
     },
+    video: {
+        width: '100%',
+        height: '100%',
+    },
     videoFallback: {
+        width: '100%',
+        aspectRatio: 16 / 9,
+        backgroundColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
     },

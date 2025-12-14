@@ -25,11 +25,21 @@ export type CatColor = typeof CAT_COLORS[number]['value'];
 export type CatPattern = typeof CAT_PATTERNS[number]['value'];
 
 // Helper to get label from value
-export const getColorLabel = (value: string): string => {
-    return CAT_COLORS.find(c => c.value === value)?.label ?? value;
+export const getColorLabel = (color: string) => {
+    return color.charAt(0).toUpperCase() + color.slice(1);
 };
 
-export const getPatternLabel = (value: string): string => {
-    return CAT_PATTERNS.find(p => p.value === value)?.label ?? value;
+export const getPatternLabel = (pattern: string) => {
+    return pattern.charAt(0).toUpperCase() + pattern.slice(1);
 };
 
+export const formatCatAppearance = (cat: { primaryColor?: string | null; pattern?: string | null; sex?: string }) => {
+    const parts: string[] = [];
+    if (cat.primaryColor) parts.push(getColorLabel(cat.primaryColor));
+    if (cat.pattern && cat.pattern !== 'unknown') parts.push(getPatternLabel(cat.pattern));
+    if (parts.length === 0) {
+        if (cat.sex && cat.sex !== 'unknown') return cat.sex.charAt(0).toUpperCase() + cat.sex.slice(1);
+        return 'Unknown';
+    }
+    return parts.join(' • ');
+};

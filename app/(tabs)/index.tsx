@@ -1,3 +1,4 @@
+import { MapCatCard } from '@/components/MapCatCard';
 import { GlassView } from '@/components/ui/GlassView';
 import { NativeGlassIconButton } from '@/components/ui/NativeGlassIconButton';
 import { getColorLabel, getPatternLabel } from '@/constants/CatAppearance';
@@ -5,6 +6,7 @@ import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { getCatStatusState } from '@/lib/cat_logic';
 import { addFeeding, getCats, updateCat } from '@/lib/database';
+import { updateWidgetData } from '@/lib/widget';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
@@ -108,8 +110,12 @@ export default function MapScreen() {
     useEffect(() => {
         if (!filteredCats.length) {
             setSelectedCatId(null);
+            updateWidgetData([]); // Clear widget if no cats
             return;
         }
+
+        updateWidgetData(filteredCats); // Update widget with new cat list
+
         if (!selectedCatId || !filteredCats.some((cat) => cat.id === selectedCatId)) {
             setSelectedCatId(filteredCats[0].id);
             carouselRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -287,8 +293,11 @@ export default function MapScreen() {
         });
         const { precise } = getDisplayCoordinate(item);
         const isLast = index === filteredCats.length - 1;
-        const statusState = getCatStatusState(item as any); // Calculate status
+        const statusState = getCatStatusState(item as any);
 
+        // Local state for carousel and uploading - separated component to avoid hooks in renderItem?
+        // Inline renderItem with hooks causes issues. 
+        // We must extract this to a component to use hooks like useState/useEffect for the carousel.
         return (
             <Animated.View
                 style={{
@@ -297,110 +306,20 @@ export default function MapScreen() {
                     marginRight: isLast ? 0 : CARD_SPACING,
                 }}
             >
-                <GlassView intensity={80} style={[styles.cardShell, { backgroundColor: cardSurface }]}>
-                    <Pressable onPress={() => router.push(`/cat/${item.id}`)} style={{ flex: 1 }}>
-                        <View style={styles.cardHeader}>
-                            <Image
-                                source={item.image && item.image.startsWith('http') ? { uri: item.image } : CAT_FALLBACK}
-                                style={styles.avatar}
-                            />
-                            <View style={{ flex: 1 }}>
-                                <View style={styles.cardHeaderRow}>
-                                    <Text style={[styles.catName, { color: primaryTextColor }]} numberOfLines={1}>
-                                        {item.name}
-                                    </Text>
-                                    <View style={[
-                                        styles.statusBadge,
-                                        { backgroundColor: statusState.statusColor }
-                                    ]}>
-                                        <Text style={[
-                                            styles.statusBadgeText,
-                                            { color: statusState.labelColor }
-                                        ]}>{statusState.statusText}</Text>
-                                    </View>
-                                </View>
-                                <Text style={[styles.catBreed, { color: secondaryTextColor }]} numberOfLines={1}>
-                                    {formatCatAppearance(item)}
-                                </Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.locationRow}>
-                            <SymbolView
-                                name={precise ? 'lock.open.fill' : 'lock.fill'}
-                                tintColor={precise ? Colors.primary.green : Colors.primary.yellow}
-                                size={18}
-                            />
-                            <Text style={[styles.locationLabel, { color: secondaryTextColor }]}>
-                                {catLocationCopy(item, precise)}
-                            </Text>
-                        </View>
-
-                        {item.rescueFlags?.length ? (
-                            <Text style={[styles.tagline, { color: secondaryTextColor }]}>
-                                {item.rescueFlags[0]
-                                    ? item.rescueFlags[0].charAt(0).toUpperCase() + item.rescueFlags[0].slice(1)
-                                    : ''}
-                            </Text>
-                        ) : null}
-
-                        <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>
-                            <StatRow
-                                icon="fork.knife"
-                                label="Last Fed"
-                                value={getTimeAgo(item.lastFed)}
-                                tint={statusState.markerColor === 'green' ? '#34C759' : statusState.markerColor === 'orange' ? '#F4B63E' : '#FF6B6B'}
-                                valueColor={primaryTextColor}
-                                dynamicLabelColor={primaryTextColor}
-                            />
-                            <StatRow
-                                icon="eye.fill"
-                                label="Seen"
-                                value={getTimeAgo(item.lastSighted)}
-                                tint="#34C759"
-                                valueColor={primaryTextColor}
-                                dynamicLabelColor={primaryTextColor}
-                            />
-                            <StatRow
-                                icon={item.tnrStatus ? 'checkmark.shield.fill' : 'exclamationmark.shield.fill'}
-                                label="TNR"
-                                value={item.tnrStatus ? 'Sterilized' : 'Intact'}
-                                tint={Colors.primary.blue}
-                                valueColor={primaryTextColor}
-                                dynamicLabelColor={primaryTextColor}
-                            />
-                        </View>
-
-                        <View style={styles.actionsRow}>
-                            <MapActionButton
-                                icon="fork.knife"
-                                label={feedingCatId === item.id ? 'Logging…' : 'Fed'}
-                                onPress={() => handleFeedCat(item)}
-                                disabled={feedingCatId === item.id}
-                                textColor={primaryTextColor}
-                                iconColor={primaryTextColor}
-                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
-                            />
-                            <MapActionButton
-                                icon="cross.case.fill"
-                                label={(item.status ?? '').toLowerCase() === 'needs help' ? 'Mark OK' : 'Help'}
-                                onPress={() => promptNeedsHelp(item)}
-                                disabled={statusUpdatingCatId === item.id}
-                                textColor={primaryTextColor}
-                                iconColor={primaryTextColor}
-                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
-                            />
-                            <MapActionButton
-                                icon="location.fill"
-                                label="Go"
-                                onPress={() => handleNavigate(item)}
-                                textColor={primaryTextColor}
-                                iconColor={primaryTextColor}
-                                backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
-                            />
-                        </View>
-                    </Pressable>
-                </GlassView>
+                <MapCatCard
+                    item={item}
+                    precise={precise}
+                    statusState={statusState}
+                    onNavigate={() => handleNavigate(item)}
+                    onFeed={() => handleFeedCat(item)}
+                    onNeedsHelp={() => promptNeedsHelp(item)}
+                    isFeeding={feedingCatId === item.id}
+                    isUpdatingStatus={statusUpdatingCatId === item.id}
+                    cardSurface={cardSurface}
+                    primaryTextColor={primaryTextColor}
+                    secondaryTextColor={secondaryTextColor}
+                    statSurface={statSurface}
+                />
             </Animated.View>
         );
     };
@@ -561,14 +480,14 @@ const StatRow = ({
 
 const formatCatAppearance = (cat: MapCat): string => {
     const parts: string[] = [];
-    
+
     if (cat.primaryColor) {
         parts.push(getColorLabel(cat.primaryColor));
     }
     if (cat.pattern && cat.pattern !== 'unknown') {
         parts.push(getPatternLabel(cat.pattern));
     }
-    
+
     if (parts.length === 0) {
         // Fallback to sex if no appearance info
         if (cat.sex && cat.sex !== 'unknown') {
@@ -576,7 +495,7 @@ const formatCatAppearance = (cat: MapCat): string => {
         }
         return 'Unknown';
     }
-    
+
     return parts.join(' • ');
 };
 
@@ -819,8 +738,6 @@ const styles = StyleSheet.create({
         height: 44,
         borderRadius: 22,
         borderWidth: 3,
-        borderColor: 'white',
-        backgroundColor: 'white',
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: 'black',

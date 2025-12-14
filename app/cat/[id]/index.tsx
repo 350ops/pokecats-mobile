@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=800&q=80';
@@ -35,6 +35,7 @@ export default function CatDetailsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const theme = isDark ? Colors.dark : Colors.light;
+    const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
     const [cat, setCat] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -142,9 +143,11 @@ export default function CatDetailsScreen() {
             setActionLoading(true);
             const uploadedUrl = await uploadCatImage(result.assets[0].uri);
             if (uploadedUrl) {
-                await updateCat(Number(cat.id), { image: uploadedUrl });
-                setCat({ ...cat, image: uploadedUrl });
-                Alert.alert('Success', 'Photo updated!');
+                const currentPhotos = cat.photos || [];
+                const newPhotos = [...currentPhotos, uploadedUrl];
+                await updateCat(Number(cat.id), { photos: newPhotos });
+                setCat({ ...cat, photos: newPhotos });
+                Alert.alert('Success', 'Photo added to gallery!');
             } else {
                 Alert.alert('Error', 'Failed to upload photo.');
             }
@@ -184,13 +187,34 @@ export default function CatDetailsScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <Stack.Screen options={{ headerShown: false }} />
 
-            <ScrollView 
-                style={styles.scrollView} 
+            <ScrollView
+                style={styles.scrollView}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 200 }]}
             >
                 {/* Header Image with Gradient */}
                 <View style={styles.imageContainer}>
-                    <Image source={{ uri: (cat.image && cat.image.startsWith('http')) ? cat.image : FALLBACK_IMAGE }} style={styles.image} />
+                    {(() => {
+                        const allPhotos = [cat.image, ...(cat.photos || [])].filter(url => url && url.startsWith('http'));
+                        const photosToDisplay = allPhotos.length > 0 ? allPhotos : [FALLBACK_IMAGE];
+
+                        return (
+                            <ScrollView
+                                horizontal
+                                pagingEnabled
+                                showsHorizontalScrollIndicator={false}
+                                bounces={false}
+                            >
+                                {photosToDisplay.map((img, i) => (
+                                    <Image
+                                        key={i}
+                                        source={{ uri: img }}
+                                        style={[styles.image, { width: SCREEN_WIDTH }]}
+                                        resizeMode="cover"
+                                    />
+                                ))}
+                            </ScrollView>
+                        );
+                    })()}
                     <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.7)']}
                         style={styles.imageGradient}
@@ -229,8 +253,8 @@ export default function CatDetailsScreen() {
                         <View style={styles.alertsSection}>
                             <View style={styles.alertPills}>
                                 {alerts.map((alert) => (
-                                    <View 
-                                        key={alert.key} 
+                                    <View
+                                        key={alert.key}
                                         style={[styles.alertPill, { backgroundColor: `${alert.color}20`, borderColor: alert.color }]}
                                     >
                                         <SymbolView name={alert.icon as any} size={14} tintColor={alert.color} />
@@ -243,34 +267,34 @@ export default function CatDetailsScreen() {
 
                     {/* Key Status Grid */}
                     <View style={styles.statusGrid}>
-                        <StatusItem 
-                            icon="fork.knife" 
-                            label="Last Fed" 
-                            value={formatTimeAgo(cat.lastFed)} 
-                            theme={theme} 
+                        <StatusItem
+                            icon="fork.knife"
+                            label="Last Fed"
+                            value={formatTimeAgo(cat.lastFed)}
+                            theme={theme}
                             isDark={isDark}
                         />
-                        <StatusItem 
-                            icon="leaf.fill" 
-                            label="Feeding Status" 
+                        <StatusItem
+                            icon="leaf.fill"
+                            label="Feeding Status"
                             value={feedingStatus.text}
                             valueColor={feedingStatus.color}
-                            theme={theme} 
+                            theme={theme}
                             isDark={isDark}
                         />
-                        <StatusItem 
-                            icon="eye.fill" 
-                            label="Last Seen" 
-                            value={formatTimeAgo(cat.lastSighted)} 
-                            theme={theme} 
+                        <StatusItem
+                            icon="eye.fill"
+                            label="Last Seen"
+                            value={formatTimeAgo(cat.lastSighted)}
+                            theme={theme}
                             isDark={isDark}
                         />
-                        <StatusItem 
-                            icon="shield.fill" 
-                            label="TNR Status" 
+                        <StatusItem
+                            icon="shield.fill"
+                            label="TNR Status"
                             value={cat.tnrStatus ? 'Neutered' : 'Intact'}
                             valueColor={cat.tnrStatus ? Colors.primary.green : '#F59E0B'}
-                            theme={theme} 
+                            theme={theme}
                             isDark={isDark}
                         />
                     </View>
@@ -326,17 +350,17 @@ export default function CatDetailsScreen() {
                     disabled={actionLoading}
                     style={styles.primaryActionButton}
                 />
-                
+
                 {/* Secondary Actions - Text Links */}
                 <View style={styles.textLinksRow}>
-                    <Pressable 
+                    <Pressable
                         onPress={() => setReportModalOpen(true)}
                         style={({ pressed }) => [pressed && { opacity: 0.6 }]}
                     >
                         <Text style={[styles.textLink, { color: Colors.primary.green }]}>Report an issue</Text>
                     </Pressable>
-                    
-                    <Pressable 
+
+                    <Pressable
                         onPress={() => setQuickUpdateModalOpen(true)}
                         style={({ pressed }) => [pressed && { opacity: 0.6 }]}
                     >
@@ -429,12 +453,12 @@ export default function CatDetailsScreen() {
 }
 
 // Helper Components
-const StatusItem = ({ icon, label, value, valueColor, theme, isDark }: { 
-    icon: string; 
-    label: string; 
-    value: string; 
+const StatusItem = ({ icon, label, value, valueColor, theme, isDark }: {
+    icon: string;
+    label: string;
+    value: string;
     valueColor?: string;
-    theme: any; 
+    theme: any;
     isDark: boolean;
 }) => (
     <View style={[styles.statusItem, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
@@ -447,28 +471,28 @@ const StatusItem = ({ icon, label, value, valueColor, theme, isDark }: {
 // Helper Functions
 const formatCatSubtitle = (cat: any): string => {
     const parts: string[] = [];
-    
+
     // Add color info
     if (cat.primaryColor || cat.primary_color) {
         parts.push(getColorLabel(cat.primaryColor || cat.primary_color));
     }
-    
+
     // Add pattern info
     const pattern = cat.pattern;
     if (pattern && pattern !== 'unknown') {
         parts.push(getPatternLabel(pattern));
     }
-    
+
     // Add sex info
     const sex = cat.sex;
     if (sex && sex !== 'unknown') {
         parts.push(sex.charAt(0).toUpperCase() + sex.slice(1));
     }
-    
+
     if (parts.length === 0) {
         return 'Unknown';
     }
-    
+
     return parts.join(' • ');
 };
 
@@ -497,7 +521,7 @@ const getFeedingStatus = (lastFed?: string | Date | null): { text: string; color
 
 const getActiveAlerts = (cat: any): { key: string; label: string; icon: string; color: string }[] => {
     const alerts: { key: string; label: string; icon: string; color: string }[] = [];
-    
+
     // Check rescue flags
     const flags = cat.rescueFlags || [];
     flags.forEach((flag: string) => {

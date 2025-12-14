@@ -21,6 +21,65 @@ export type QuickReportPayload = {
     needsAttention?: boolean;
 };
 
+export const addSighting = async (catId: number | string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // 1. Insert into sightings log
+    const { error: sightingError } = await supabase
+        .from('cat_sightings')
+        .insert({
+            cat_id: catId,
+            user_id: user?.id,
+        });
+
+    if (sightingError) {
+        console.error('❌ Error adding sighting:', sightingError);
+        throw sightingError;
+    }
+
+    // 2. Update cat's last_sighted timestamp
+    const { error: updateError } = await supabase
+        .from('cats')
+        .update({ last_sighted: new Date().toISOString() })
+        .eq('id', catId);
+
+    if (updateError) {
+        console.error('❌ Error updating cat last_sighted:', updateError);
+    }
+};
+
+export const addCatPhoto = async (catId: number | string, publicUrl: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+        .from('cat_photos')
+        .insert({
+            cat_id: catId,
+            url: publicUrl,
+            user_id: user?.id,
+        });
+
+    if (error) {
+        console.error('❌ Error adding photo record:', error);
+        throw error;
+    }
+};
+
+export const getCatPhotos = async (catId: number | string) => {
+    const { data, error } = await supabase
+        .from('cat_photos')
+        .select('*')
+        .eq('cat_id', catId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('❌ Error fetching photos:', error);
+        return [];
+    }
+    return data;
+};
+
+
 // We no longer use expo-sqlite directly for data, but could use it for offline caching if we wanted to get fancy.
 // For this migration, we are fetching directly from Supabase.
 
@@ -51,7 +110,7 @@ export const addCat = async (
     }
 ) => {
     console.log('🐱 Adding cat with image:', image ? `${image.substring(0, 50)}...` : 'NO IMAGE');
-    
+
     const insertData = {
         name,
         description,
@@ -72,9 +131,9 @@ export const addCat = async (
         needs_attention: options?.needsAttention ?? false,
         location_description: options?.locationDescription ?? null,
     };
-    
+
     console.log('📝 Insert data (image field):', insertData.image ? 'HAS IMAGE' : 'NO IMAGE');
-    
+
     const { error, data } = await supabase
         .from('cats')
         .insert(insertData)
@@ -87,11 +146,28 @@ export const addCat = async (
     }
 };
 
-import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system';
 
-export const updateCat = async (id: number, updates: { latitude?: number; longitude?: number; lastFed?: string; lastSighted?: string; status?: string; rescueFlags?: string[]; locationDescription?: string; colorProfile?: string[]; tnrStatus?: boolean; description?: string; image?: string }) => {
+export const updateCat = async (id: number, updates: {
+    name?: string;
+    latitude?: number;
+    longitude?: number;
+    lastFed?: string;
+    lastSighted?: string;
+    status?: string;
+    rescueFlags?: string[];
+    locationDescription?: string;
+    colorProfile?: string[];
+    tnrStatus?: boolean;
+    description?: string;
+    image?: string;
+    pattern?: string;
+    sex?: string;
+    age?: string;
+    needsAttention?: boolean;
+    photos?: string[];
+}) => {
     const dbUpdates: any = {};
+    if (updates.name) dbUpdates.name = updates.name;
     if (updates.latitude) dbUpdates.latitude = updates.latitude;
     if (updates.longitude) dbUpdates.longitude = updates.longitude;
     if (updates.lastFed) dbUpdates.last_fed = updates.lastFed;
@@ -103,6 +179,11 @@ export const updateCat = async (id: number, updates: { latitude?: number; longit
     if (typeof updates.tnrStatus === 'boolean') dbUpdates.tnr_status = updates.tnrStatus;
     if (updates.description) dbUpdates.description = updates.description;
     if (updates.image) dbUpdates.image = updates.image;
+    if (updates.photos) dbUpdates.photos = updates.photos;
+    if (updates.pattern) dbUpdates.pattern = updates.pattern;
+    if (updates.sex) dbUpdates.sex = updates.sex;
+    if (updates.age) dbUpdates.approximate_age = updates.age;
+    if (typeof updates.needsAttention === 'boolean') dbUpdates.needs_attention = updates.needsAttention;
 
     const { error } = await supabase
         .from('cats')
@@ -115,26 +196,27 @@ export const updateCat = async (id: number, updates: { latitude?: number; longit
 export const uploadCatImage = async (uri: string): Promise<string | null> => {
     try {
         console.log('📷 Reading image from URI:', uri);
-        
+
         // Handle different URI formats
         let fileUri = uri;
-        
+
         // For expo-image-picker, the URI should already be a file:// URI
         // But we need to make sure it's readable
         if (!fileUri.startsWith('file://') && !fileUri.startsWith('/')) {
             console.warn('⚠️ Unexpected URI format:', fileUri);
         }
-        
-        const base64 = await FileSystem.readAsStringAsync(fileUri, { encoding: 'base64' });
-        console.log('📦 Image read successfully, base64 length:', base64.length);
-        
+
+        const response = await fetch(fileUri);
+        const arrayBuffer = await response.arrayBuffer();
+        console.log('📦 Image buffer created, byte length:', arrayBuffer.byteLength);
+
         const filePath = `cat_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
         const contentType = 'image/jpeg';
 
         console.log('⬆️ Uploading to Supabase Storage, path:', filePath);
         const { data, error } = await supabase.storage
             .from('cat-photos')
-            .upload(filePath, decode(base64), { contentType, upsert: true });
+            .upload(filePath, arrayBuffer, { contentType, upsert: true });
 
         if (error) {
             console.error('❌ Upload Error:', error);
@@ -146,7 +228,7 @@ export const uploadCatImage = async (uri: string): Promise<string | null> => {
         console.log('🔗 Public URL:', publicData.publicUrl);
         return publicData.publicUrl;
     } catch (e) {
-        console.error('❌ FileSystem Error:', e);
+        console.error('❌ Upload Error:', e);
         return null;
     }
 };
@@ -179,6 +261,7 @@ export const getCat = async (id: number) => {
         sex: data.sex ?? 'unknown',
         approximateAge: data.approximate_age ?? null,
         needsAttention: data.needs_attention ?? false,
+        photos: data.photos ?? [],
     };
 };
 
@@ -342,11 +425,11 @@ export const seedDatabase = async () => {
 
 export const submitQuickReport = async (payload: QuickReportPayload) => {
     const capturedAt = payload.capturedAt ?? new Date().toISOString();
-    
+
     // Upload image to Supabase Storage if it's a local file URI
     let imageUrl = payload.photoUri ?? '';
     console.log('📸 Photo URI received:', payload.photoUri);
-    
+
     if (payload.photoUri && (payload.photoUri.startsWith('file://') || payload.photoUri.startsWith('/') || payload.photoUri.startsWith('ph://'))) {
         console.log('📤 Uploading cat image to Supabase Storage...');
         const uploadedUrl = await uploadCatImage(payload.photoUri);
@@ -360,7 +443,7 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
     } else if (payload.photoUri) {
         console.log('🔗 Using existing URL as image:', payload.photoUri);
     }
-    
+
     if (payload.catId) {
         await updateCat(payload.catId, {
             latitude: payload.latitude,

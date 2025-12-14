@@ -1,7 +1,8 @@
 import { Colors } from '@/constants/Colors';
+import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import MapView, { Region } from 'react-native-maps';
 import { GlassButton } from './ui/GlassButton';
 import { GlassView } from './ui/GlassView';
 
@@ -33,20 +34,23 @@ export function LocationAdjustModal({ visible, coordinate, onClose, onSave }: Lo
     const [draftCoordinate, setDraftCoordinate] = useState<Coordinate>(coordinate ?? fallbackCoordinate());
 
     const region = useMemo(() => {
-        if (draftCoordinate) {
+        if (coordinate) {
             return {
-                latitude: draftCoordinate.latitude,
-                longitude: draftCoordinate.longitude,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
             };
         }
         return DEFAULT_REGION;
-    }, [draftCoordinate]);
+    }, []); // Only define initial region from props, then let map handle it
 
+    // Update draft coordinate when prop changes
     useEffect(() => {
-        if (visible) {
-            setDraftCoordinate(coordinate ?? fallbackCoordinate());
+        if (visible && coordinate) {
+            setDraftCoordinate(coordinate);
+        } else if (visible && !coordinate) {
+            setDraftCoordinate(fallbackCoordinate());
         }
     }, [coordinate, visible]);
 
@@ -55,23 +59,21 @@ export function LocationAdjustModal({ visible, coordinate, onClose, onSave }: Lo
             <View style={styles.backdrop}>
                 <GlassView style={styles.sheet} intensity={70}>
                     <Text style={styles.title}>Adjust pin location</Text>
-                    <MapView
-                        style={styles.map}
-                        initialRegion={region}
-                        region={region}
-                        showsPointsOfInterest={false}
-                        onRegionChangeComplete={(updated) => {
-                            setDraftCoordinate({ latitude: updated.latitude, longitude: updated.longitude });
-                        }}
-                    >
-                        {draftCoordinate && (
-                            <Marker
-                                coordinate={draftCoordinate}
-                                draggable
-                                onDragEnd={(event) => setDraftCoordinate(event.nativeEvent.coordinate)}
-                            />
-                        )}
-                    </MapView>
+
+                    <View style={styles.mapContainer}>
+                        <MapView
+                            style={styles.map}
+                            initialRegion={region}
+                            showsPointsOfInterest={false}
+                            onRegionChangeComplete={(updated) => {
+                                setDraftCoordinate({ latitude: updated.latitude, longitude: updated.longitude });
+                            }}
+                        />
+                        <View style={styles.centerMarkerContainer} pointerEvents="none">
+                            <SymbolView name="mappin.circle.fill" size={40} tintColor="#eb4d3d" />
+                        </View>
+                    </View>
+
                     <View style={styles.actions}>
                         <GlassButton title="Cancel" variant="glass" onPress={onClose} style={{ flex: 1 }} />
                         <GlassButton
@@ -109,14 +111,27 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
     },
-    map: {
+    mapContainer: {
         height: 300,
         borderRadius: 20,
         overflow: 'hidden',
+        position: 'relative',
+    },
+    map: {
+        flex: 1,
+    },
+    centerMarkerContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: -20, // Offset to align pin point with center
     },
     actions: {
         flexDirection: 'row',
         gap: 12,
     },
 });
-

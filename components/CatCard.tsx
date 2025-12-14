@@ -1,6 +1,11 @@
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { addCatPhoto, addSighting, getCatPhotos, uploadCatImage } from '@/lib/database';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GlassView } from './ui/GlassView';
 
 // Compatible definition with DB and Map
@@ -39,11 +44,88 @@ const ExclamationIcon = require('@/assets/images/Exclamation.png');
 const ShieldIcon = require('@/assets/images/Shield.png');
 const CatPlaceholder = require('@/assets/images/cat-placeholder.jpg');
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export function CatCard({ cat }: CatCardProps) {
     const { isDark } = useTheme();
     const distanceMeta = getDistanceMeta(cat);
     const needsHelp = (cat.status ?? '').toLowerCase() === 'needs help';
     const isTnrd = cat.tnrStatus === true;
+
+    // Local state for "Seen" update (optimistic)
+    const [lastSighted, setLastSighted] = useState(cat.lastSighted);
+    const [photos, setPhotos] = useState<string[]>(cat.image ? [cat.image] : []);
+    const [uploading, setUploading] = useState(false);
+
+    useEffect(() => {
+        setLastSighted(cat.lastSighted);
+    }, [cat.lastSighted]);
+
+    useEffect(() => {
+        // Fetch photos on mount
+        const loadPhotos = async () => {
+            const dbPhotos = await getCatPhotos(cat.id);
+            if (dbPhotos && dbPhotos.length > 0) {
+                setPhotos(dbPhotos.map(p => p.url));
+            } else if (cat.image) {
+                setPhotos([cat.image]);
+            }
+        };
+        loadPhotos();
+    }, [cat.id, cat.image]);
+
+    const handleSeen = async () => {
+        try {
+            setLastSighted(new Date().toISOString()); // Optimistic
+            await addSighting(cat.id);
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Failed to record sighting.');
+        }
+    };
+
+    const handleEdit = () => {
+        router.push(`/cat/${cat.id}/edit`);
+    };
+
+    const handlePhoto = async () => {
+        try {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permission needed', 'Camera access is required to take photos.');
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                quality: 0.7,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                setUploading(true);
+                const publicUrl = await uploadCatImage(result.assets[0].uri);
+                if (publicUrl) {
+                    await addCatPhoto(cat.id, publicUrl);
+                    setPhotos(prev => [publicUrl, ...prev]);
+                } else {
+                    Alert.alert('Upload Failed', 'Could not upload photo.');
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Something went wrong taking the photo.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const renderPhoto = ({ item }: { item: string }) => (
+        <Image
+            source={{ uri: item }}
+            style={[styles.image, { width: SCREEN_WIDTH - 80 }]}
+            resizeMode="cover"
+        />
+    );
 
     return (
         <GlassView
@@ -57,14 +139,36 @@ export function CatCard({ cat }: CatCardProps) {
             intensity={isDark ? 50 : 0}
         >
             <View style={styles.imageWrapper}>
-                <Image 
-                    source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CatPlaceholder} 
-                    style={styles.image} 
-                />
+                {photos.length > 0 ? (
+                    <FlatList
+                        data={photos}
+                        renderItem={renderPhoto}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.carousel}
+                        contentContainerStyle={styles.carouselContent}
+                    />
+                ) : (
+                    <Image source={CatPlaceholder} style={styles.image} />
+                )}
+
+                {uploading && (
+                    <View style={styles.loaderOverlay}>
+                        <ActivityIndicator color="#fff" size="large" />
+                    </View>
+                )}
+
                 <View style={styles.statusIcons}>
                     <Image source={needsHelp ? ExclamationIcon : CheckmarkIcon} style={styles.statusIcon} />
                     {isTnrd && <Image source={ShieldIcon} style={styles.statusIcon} />}
                 </View>
+
+                {photos.length > 1 && (
+                    <View style={styles.pageIndicator}>
+                        <Text style={styles.pageIndicatorText}>{photos.length} photos</Text>
+                    </View>
+                )}
             </View>
 
             <View style={styles.content}>
@@ -82,9 +186,25 @@ export function CatCard({ cat }: CatCardProps) {
                     {cat.breed}
                 </Text>
 
+                {/* New Action Buttons */}
+                <View style={styles.actionRow}>
+                    <Pressable style={styles.actionButton} onPress={handleSeen}>
+                        <SymbolView name="eye.fill" size={16} tintColor={Colors.primary.blue} />
+                        <Text style={[styles.actionButtonText, { color: Colors.primary.blue }]}>Seen</Text>
+                    </Pressable>
+                    <Pressable style={styles.actionButton} onPress={handleEdit}>
+                        <SymbolView name="pencil" size={16} tintColor={isDark ? Colors.glass.textSecondary : Colors.light.icon} />
+                        <Text style={[styles.actionButtonText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Edit</Text>
+                    </Pressable>
+                    <Pressable style={styles.actionButton} onPress={handlePhoto}>
+                        <SymbolView name="camera.fill" size={16} tintColor={isDark ? Colors.glass.textSecondary : Colors.light.icon} />
+                        <Text style={[styles.actionButtonText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Photo</Text>
+                    </Pressable>
+                </View>
+
                 <View style={styles.footerRow}>
                     <Text style={[styles.meta, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                        Seen {formatTimeAgo(cat.lastSighted)}
+                        Seen {formatTimeAgo(lastSighted)}
                     </Text>
                 </View>
             </View>
@@ -163,6 +283,14 @@ const styles = StyleSheet.create({
     },
     imageWrapper: {
         position: 'relative',
+        height: 200,
+        backgroundColor: '#333',
+    },
+    carousel: {
+        flex: 1,
+    },
+    carouselContent: {
+        // center?
     },
     image: {
         width: '100%',
@@ -179,6 +307,27 @@ const styles = StyleSheet.create({
     statusIcon: {
         width: 28,
         height: 28,
+    },
+    loaderOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    pageIndicator: {
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    pageIndicatorText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
     },
     content: {
         padding: 16,
@@ -213,15 +362,35 @@ const styles = StyleSheet.create({
     name: {
         fontSize: 20,
         fontWeight: 'bold',
+        marginTop: 4,
     },
     breed: {
         fontSize: 14,
-        marginBottom: 6,
+        marginBottom: 12,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginBottom: 16,
+    },
+    actionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(0,0,0,0.05)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    actionButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     footerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginTop: 4,
     },
     meta: {
         fontSize: 12,
