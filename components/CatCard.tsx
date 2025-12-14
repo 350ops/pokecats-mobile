@@ -1,11 +1,13 @@
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { addCatPhoto, addSighting, getCatPhotos, uploadCatImage } from '@/lib/database';
+import { addCatPhoto, addFeeding, addSighting, getCatPhotos, updateCat, uploadCatImage } from '@/lib/database';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { GlassView } from './ui/GlassView';
 
 // Compatible definition with DB and Map
@@ -56,6 +58,8 @@ export function CatCard({ cat }: CatCardProps) {
     const [lastSighted, setLastSighted] = useState(cat.lastSighted);
     const [photos, setPhotos] = useState<string[]>(cat.image ? [cat.image] : []);
     const [uploading, setUploading] = useState(false);
+    const [isFeeding, setIsFeeding] = useState(false);
+    const [isMarkingSeen, setIsMarkingSeen] = useState(false);
 
     useEffect(() => {
         setLastSighted(cat.lastSighted);
@@ -64,7 +68,7 @@ export function CatCard({ cat }: CatCardProps) {
     useEffect(() => {
         // Fetch photos on mount
         const loadPhotos = async () => {
-            const dbPhotos = await getCatPhotos(cat.id);
+            const dbPhotos = await getCatPhotos(Number(cat.id));
             if (dbPhotos && dbPhotos.length > 0) {
                 setPhotos(dbPhotos.map(p => p.url));
             } else if (cat.image) {
@@ -75,12 +79,31 @@ export function CatCard({ cat }: CatCardProps) {
     }, [cat.id, cat.image]);
 
     const handleSeen = async () => {
+        if (isMarkingSeen) return;
         try {
+            setIsMarkingSeen(true);
             setLastSighted(new Date().toISOString()); // Optimistic
             await addSighting(cat.id);
+            // Wait for animation
+            setTimeout(() => setIsMarkingSeen(false), 1500);
         } catch (error) {
             console.error(error);
             Alert.alert('Error', 'Failed to record sighting.');
+            setIsMarkingSeen(false);
+        }
+    };
+
+    const handleFeed = async () => {
+        if (isFeeding) return;
+        try {
+            setIsFeeding(true);
+            await addFeeding(Number(cat.id), 'Quick Feed', 'Snack', false);
+            await updateCat(Number(cat.id), { lastFed: new Date().toISOString() });
+            setTimeout(() => setIsFeeding(false), 1500);
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Failed to log feeding.');
+            setIsFeeding(false);
         }
     };
 
@@ -90,12 +113,7 @@ export function CatCard({ cat }: CatCardProps) {
 
     const handlePhoto = async () => {
         try {
-            const permission = await ImagePicker.requestCameraPermissionsAsync();
-            if (!permission.granted) {
-                Alert.alert('Permission needed', 'Camera access is required to take photos.');
-                return;
-            }
-
+            // Check permissions first? expo-image-picker handles it usually
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 quality: 0.7,
@@ -105,7 +123,7 @@ export function CatCard({ cat }: CatCardProps) {
                 setUploading(true);
                 const publicUrl = await uploadCatImage(result.assets[0].uri);
                 if (publicUrl) {
-                    await addCatPhoto(cat.id, publicUrl);
+                    await addCatPhoto(Number(cat.id), publicUrl);
                     setPhotos(prev => [publicUrl, ...prev]);
                 } else {
                     Alert.alert('Upload Failed', 'Could not upload photo.');
@@ -187,19 +205,42 @@ export function CatCard({ cat }: CatCardProps) {
                 </Text>
 
                 {/* New Action Buttons */}
+                {/* New Action Buttons */}
                 <View style={styles.actionRow}>
-                    <Pressable style={styles.actionButton} onPress={handleSeen}>
-                        <SymbolView name="eye.fill" size={16} tintColor={Colors.primary.blue} />
-                        <Text style={[styles.actionButtonText, { color: Colors.primary.blue }]}>Seen</Text>
-                    </Pressable>
-                    <Pressable style={styles.actionButton} onPress={handleEdit}>
-                        <SymbolView name="pencil" size={16} tintColor={isDark ? Colors.glass.textSecondary : Colors.light.icon} />
-                        <Text style={[styles.actionButtonText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Edit</Text>
-                    </Pressable>
-                    <Pressable style={styles.actionButton} onPress={handlePhoto}>
-                        <SymbolView name="camera.fill" size={16} tintColor={isDark ? Colors.glass.textSecondary : Colors.light.icon} />
-                        <Text style={[styles.actionButtonText, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>Photo</Text>
-                    </Pressable>
+                    <AnimatedActionButton
+                        style={styles.actionButton}
+                        icon="eye.fill"
+                        popupIcon="checkmark.circle.fill"
+                        popupColor={Colors.primary.blue}
+                        onPress={handleSeen}
+                        isActive={isMarkingSeen}
+                        iconColor={Colors.primary.blue}
+                        backgroundColor={isDark ? 'rgba(63, 143, 247, 0.15)' : 'rgba(63, 143, 247, 0.1)'}
+                    />
+                    <AnimatedActionButton
+                        style={styles.actionButton}
+                        icon="pencil"
+                        onPress={handleEdit}
+                        iconColor={isDark ? Colors.glass.textSecondary : Colors.light.icon}
+                        backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
+                    />
+                    <AnimatedActionButton
+                        style={styles.actionButton}
+                        icon="fork.knife"
+                        popupIcon="heart.fill"
+                        popupColor="#FF6B6B"
+                        onPress={handleFeed}
+                        isActive={isFeeding}
+                        iconColor={isDark ? '#FF6B6B' : '#E05858'}
+                        backgroundColor={isDark ? 'rgba(255, 107, 107, 0.15)' : 'rgba(255, 107, 107, 0.1)'}
+                    />
+                    <AnimatedActionButton
+                        style={styles.actionButton}
+                        icon="camera.fill"
+                        onPress={handlePhoto}
+                        iconColor={isDark ? Colors.glass.textSecondary : Colors.light.icon}
+                        backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
+                    />
                 </View>
 
                 <View style={styles.footerRow}>
@@ -283,7 +324,7 @@ const styles = StyleSheet.create({
     },
     imageWrapper: {
         position: 'relative',
-        height: 200,
+        height: 120,
         backgroundColor: '#333',
     },
     carousel: {
@@ -294,7 +335,7 @@ const styles = StyleSheet.create({
     },
     image: {
         width: '100%',
-        height: 200,
+        height: 120,
         backgroundColor: '#333',
     },
     statusIcons: {
@@ -330,7 +371,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     content: {
-        padding: 16,
+        padding: 12,
     },
     distanceRow: {
         flexDirection: 'row',
@@ -366,25 +407,23 @@ const styles = StyleSheet.create({
     },
     breed: {
         fontSize: 14,
-        marginBottom: 12,
+        marginBottom: 8,
     },
     actionRow: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16,
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 10,
     },
     actionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: 'rgba(0,0,0,0.05)',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 16,
+        width: '47%',
+        height: 38,
     },
-    actionButtonText: {
-        fontSize: 13,
-        fontWeight: '600',
+    innerButton: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 12,
     },
     footerRow: {
         flexDirection: 'row',
@@ -400,3 +439,89 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 });
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function AnimatedActionButton({
+    icon,
+    popupIcon,
+    popupColor,
+    onPress,
+    isActive,
+    iconColor,
+    backgroundColor,
+    style,
+}: {
+    icon: string;
+    popupIcon?: string;
+    popupColor?: string;
+    onPress: () => void;
+    isActive?: boolean;
+    iconColor: string;
+    backgroundColor: string;
+    style?: StyleProp<ViewStyle>;
+}) {
+    const scale = useSharedValue(1);
+    const popupScale = useSharedValue(0);
+    const popupOpacity = useSharedValue(0);
+    const popupTransY = useSharedValue(0);
+
+    useEffect(() => {
+        if (isActive && popupIcon) {
+            // Play popup animation
+            popupTransY.value = 0;
+            popupOpacity.value = 1;
+            popupScale.value = 0.5;
+
+            popupScale.value = withSequence(
+                withTiming(1.2, { duration: 200, easing: Easing.out(Easing.ease) }),
+                withTiming(1.0, { duration: 100 })
+            );
+
+            popupTransY.value = withTiming(-15, { duration: 400, easing: Easing.out(Easing.ease) });
+
+            popupOpacity.value = withSequence(
+                withTiming(1, { duration: 200 }),
+                withTiming(0, { duration: 300 })
+            );
+        }
+    }, [isActive, popupIcon]);
+
+    const handlePress = () => {
+        if (isActive) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        scale.value = withSequence(
+            withTiming(0.9, { duration: 50 }),
+            withTiming(1, { duration: 100 })
+        );
+        onPress();
+    };
+
+    const rStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }],
+    }));
+
+    const rPopupStyle = useAnimatedStyle(() => ({
+        transform: [
+            { scale: popupScale.value },
+            { translateY: popupTransY.value }
+        ],
+        opacity: popupOpacity.value,
+    }));
+
+    return (
+        <View style={style}>
+            <AnimatedPressable
+                style={[styles.innerButton, { backgroundColor }, rStyle]}
+                onPress={handlePress}
+            >
+                <SymbolView name={icon as any} size={18} tintColor={iconColor} />
+            </AnimatedPressable>
+            {popupIcon && (
+                <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 10, pointerEvents: 'none' }, rPopupStyle]}>
+                    <SymbolView name={popupIcon as any} size={24} tintColor={popupColor} />
+                </Animated.View>
+            )}
+        </View>
+    );
+}

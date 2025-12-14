@@ -7,6 +7,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { submitQuickReport } from '@/lib/database';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -155,7 +156,7 @@ export default function ReportScreen() {
 
         try {
             setLoading(true);
-            
+
             // Determine status based on badges
             let status = 'Healthy';
             if (selectedBadges.includes('injured')) {
@@ -211,18 +212,34 @@ export default function ReportScreen() {
                 {/* Photo */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Photo</Text>
-                    <Pressable onPress={pickPhoto} style={[styles.photoPickerBox, { borderColor: inputBorder }]}>
-                        {photo ? (
-                            <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
-                        ) : (
-                            <View style={styles.photoPlaceholder}>
-                                <SymbolView name="photo.on.rectangle" size={40} tintColor={secondaryTextColor} />
-                                <Text style={[styles.photoPlaceholderText, { color: secondaryTextColor }]}>
-                                    Tap to select photo
-                                </Text>
+                    <View style={styles.avatarSection}>
+                        <Pressable onPress={pickPhoto} style={styles.avatarPressable}>
+                            <LinearGradient
+                                colors={['#0084ff57', '#CD4486']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.avatarGradient}
+                            >
+                                <View style={[styles.avatarInner, { backgroundColor }]}>
+                                    {photo ? (
+                                        <Image source={{ uri: photo.uri }} style={styles.avatarImage} />
+                                    ) : (
+                                        <View style={styles.avatarPlaceholder}>
+                                            <SymbolView name="camera.fill" size={32} tintColor={secondaryTextColor} />
+                                        </View>
+                                    )}
+                                </View>
+                            </LinearGradient>
+                            <View style={[styles.editBadge, { backgroundColor: '#0055ffff' }]}>
+                                <SymbolView name="plus" size={14} tintColor="#fff" />
                             </View>
-                        )}
-                    </Pressable>
+                        </Pressable>
+                        <Pressable onPress={pickPhoto}>
+                            <Text style={{ color: '#006effff', fontWeight: '600', marginTop: 12 }}>
+                                {photo ? 'Change Photo' : 'Add Photo'}
+                            </Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 {/* Name */}
@@ -425,17 +442,17 @@ export default function ReportScreen() {
                     onPress={() => setNeedsAttention(!needsAttention)}
                     style={[
                         styles.attentionToggle,
-                        { 
+                        {
                             backgroundColor: needsAttention ? 'rgba(255,107,107,0.15)' : inputBg,
                             borderColor: needsAttention ? '#FF6B6B' : inputBorder,
                         },
                     ]}
                 >
                     <View style={styles.attentionContent}>
-                        <SymbolView 
-                            name={needsAttention ? 'exclamationmark.triangle.fill' : 'exclamationmark.triangle'} 
-                            size={20} 
-                            tintColor={needsAttention ? '#FF6B6B' : secondaryTextColor} 
+                        <SymbolView
+                            name={needsAttention ? 'exclamationmark.triangle.fill' : 'exclamationmark.triangle'}
+                            size={20}
+                            tintColor={needsAttention ? '#FF6B6B' : secondaryTextColor}
                         />
                         <View>
                             <Text style={[styles.attentionTitle, { color: textColor }]}>Needs Attention?</Text>
@@ -446,7 +463,7 @@ export default function ReportScreen() {
                     </View>
                     <View style={[
                         styles.checkbox,
-                        { 
+                        {
                             backgroundColor: needsAttention ? '#FF6B6B' : 'transparent',
                             borderColor: needsAttention ? '#FF6B6B' : inputBorder,
                         },
@@ -826,5 +843,45 @@ const styles = StyleSheet.create({
     },
     pickerRowText: {
         fontSize: 16,
+    },
+    avatarSection: {
+        alignItems: 'center',
+        paddingVertical: 10,
+    },
+    avatarPressable: {
+        position: 'relative',
+    },
+    avatarGradient: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarInner: {
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarPlaceholder: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 4,
+        right: 4,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });

@@ -4,14 +4,15 @@ import { GlassView } from '@/components/ui/GlassView';
 import { CAT_COLORS, CAT_PATTERNS, CatColor, CatPattern } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { getCat, updateCat, uploadCatImage } from '@/lib/database';
+import { deleteCat, getCat, updateCat, uploadCatImage } from '@/lib/database';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Image,
     KeyboardAvoidingView,
     Modal,
@@ -21,7 +22,7 @@ import {
     StyleSheet,
     Text,
     TextInput,
-    View,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -62,6 +63,7 @@ export default function EditCatScreen() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     // Form state
     const [name, setName] = useState('');
@@ -124,25 +126,28 @@ export default function EditCatScreen() {
     const [colorPickerOpen, setColorPickerOpen] = useState(false);
     const [patternPickerOpen, setPatternPickerOpen] = useState(false);
 
+    // Stabilize catId to prevent infinite loops
+    const catId = useMemo(() => Array.isArray(id) ? id[0] : id, [id]);
+    const hasLoadedRef = useRef(false);
+
     useEffect(() => {
-        loadData();
-    }, [id]);
+        if (hasLoadedRef.current || !catId) return;
+        hasLoadedRef.current = true;
+        loadData(catId);
+    }, [catId]);
 
-    const loadData = async () => {
-        // Handle id being an array (from useLocalSearchParams)
-        const catId = Array.isArray(id) ? id[0] : id;
+    const loadData = async (catIdToLoad: string) => {
+        console.log('🐱 Edit screen - catId:', catIdToLoad);
 
-        console.log('🐱 Edit screen - catId:', catId);
-
-        if (!catId) {
+        if (!catIdToLoad) {
             console.log('🐱 No catId, stopping loading');
             setLoading(false);
             return;
         }
 
         try {
-            console.log('🐱 Fetching cat with ID:', catId);
-            const cat = await getCat(Number(catId));
+            console.log('🐱 Fetching cat with ID:', catIdToLoad);
+            const cat = await getCat(Number(catIdToLoad));
             console.log('🐱 Got cat:', cat ? 'found' : 'not found');
 
             if (cat) {
@@ -257,6 +262,38 @@ export default function EditCatScreen() {
         }
     };
 
+    const handleDelete = () => {
+        Alert.alert(
+            'Delete Cat',
+            `Are you sure you want to delete ${name || 'this cat'}? This action cannot be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDeleting(true);
+                        try {
+                            const success = await deleteCat(Number(catId));
+                            if (success) {
+                                Alert.alert('Deleted', 'The cat has been removed.', [
+                                    { text: 'OK', onPress: () => router.replace('/(tabs)') }
+                                ]);
+                            } else {
+                                Alert.alert('Error', 'Failed to delete the cat. Please try again.');
+                            }
+                        } catch (error) {
+                            console.error('Delete error:', error);
+                            Alert.alert('Error', 'Something went wrong. Please try again.');
+                        } finally {
+                            setDeleting(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const selectedColorLabel = CAT_COLORS.find(c => c.value === primaryColor)?.label;
     const selectedPatternLabel = CAT_PATTERNS.find(p => p.value === pattern)?.label;
 
@@ -290,7 +327,7 @@ export default function EditCatScreen() {
                 {/* Photo */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Photo</Text>
-                    <Pressable onPress={pickImage} style={[styles.photoPickerBox, { borderColor: inputBorder }]}>
+                    <Pressable onPress={pickImage} style={[styles.inputBox, { borderColor: inputBorder }]}>
                         {(newImageUri || image) ? (
                             <Image source={{ uri: newImageUri || image || undefined }} style={styles.photoPreview} />
                         ) : (
@@ -548,9 +585,23 @@ export default function EditCatScreen() {
                     icon="checkmark.circle.fill"
                     variant="primary"
                     onPress={handleSave}
-                    disabled={saving || !name.trim()}
+                    disabled={saving || deleting || !name.trim()}
                     style={{ width: '100%' }}
                 />
+                <Pressable
+                    onPress={handleDelete}
+                    disabled={deleting || saving}
+                    style={styles.deleteButton}
+                >
+                    {deleting ? (
+                        <ActivityIndicator size="small" color="#FF6B6B" />
+                    ) : (
+                        <>
+                            <SymbolView name="trash.fill" size={16} tintColor="#FF6B6B" />
+                            <Text style={styles.deleteButtonText}>Delete Cat</Text>
+                        </>
+                    )}
+                </Pressable>
             </View>
 
             {/* Color Picker Modal */}
@@ -688,6 +739,13 @@ const styles = StyleSheet.create({
     multilineInput: {
         minHeight: 100,
         textAlignVertical: 'top',
+    },
+    inputBox: {
+        height: 180,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderStyle: 'dashed',
+        overflow: 'hidden',
     },
     photoPickerBox: {
         height: 180,
@@ -870,5 +928,18 @@ const styles = StyleSheet.create({
     },
     pickerRowText: {
         fontSize: 16,
+    },
+    deleteButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        marginTop: 16,
+        paddingVertical: 12,
+    },
+    deleteButtonText: {
+        color: '#FF6B6B',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

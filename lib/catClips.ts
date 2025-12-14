@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 
+// Force update check
+
 const VIDEO_BUCKET = 'cat_videos';
 const THUMB_BUCKET = 'cat_thumbnails';
 
@@ -27,7 +29,11 @@ export async function fetchClipPage(offset: number, limit: number): Promise<{ cl
         supabase.auth.getSession(),
         supabase
             .from('cat_clips')
-            .select('*')
+            .select(`
+                *,
+                likes:cat_clip_likes(count),
+                comments:cat_clip_comments(count)
+            `)
             .order('created_at', { ascending: false })
             .range(offset, offset + limit - 1),
     ]);
@@ -43,32 +49,15 @@ export async function fetchClipPage(offset: number, limit: number): Promise<{ cl
     const clipIds = data.map((clip) => clip.id);
     const currentUserId = sessionData.session?.user?.id;
 
-    const [likeCountsRes, commentCountsRes, myLikesRes] = await Promise.all([
-        supabase
+    const { data: myLikes } = currentUserId
+        ? await supabase
             .from('cat_clip_likes')
-            .select('clip_id, count:count(*)')
+            .select('clip_id')
+            .eq('user_id', currentUserId)
             .in('clip_id', clipIds)
-            .group('clip_id'),
-        supabase
-            .from('cat_clip_comments')
-            .select('clip_id, count:count(*)')
-            .in('clip_id', clipIds)
-            .group('clip_id'),
-        currentUserId
-            ? supabase
-                .from('cat_clip_likes')
-                .select('clip_id')
-                .eq('user_id', currentUserId)
-                .in('clip_id', clipIds)
-            : Promise.resolve({ data: [] as { clip_id: string }[] }),
-    ]);
+        : { data: [] };
 
-    const likeCountMap = new Map<string, number>();
-    const commentCountMap = new Map<string, number>();
-    (likeCountsRes.data ?? []).forEach((row: any) => likeCountMap.set(row.clip_id, row.count ?? 0));
-    (commentCountsRes.data ?? []).forEach((row: any) => commentCountMap.set(row.clip_id, row.count ?? 0));
-
-    const likedSet = new Set((myLikesRes.data ?? []).map((row: any) => row.clip_id));
+    const likedSet = new Set((myLikes ?? []).map((row: any) => row.clip_id));
 
     const signedVideoPromises = data.map((clip) =>
         supabase.storage.from(VIDEO_BUCKET).createSignedUrl(clip.video_path, SIGNED_URL_TTL)
@@ -86,8 +75,8 @@ export async function fetchClipPage(offset: number, limit: number): Promise<{ cl
         ...clip,
         videoUrl: videoUrls[idx]?.data?.signedUrl,
         thumbnailUrl: thumbUrls[idx]?.data?.signedUrl,
-        likeCount: likeCountMap.get(clip.id) ?? 0,
-        commentCount: commentCountMap.get(clip.id) ?? 0,
+        likeCount: clip.likes?.[0]?.count ?? 0,
+        commentCount: clip.comments?.[0]?.count ?? 0,
         likedByMe: likedSet.has(clip.id),
     }));
 

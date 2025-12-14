@@ -193,6 +193,32 @@ export const updateCat = async (id: number, updates: {
     if (error) console.error('Error updating cat:', error);
 };
 
+export const deleteCat = async (id: number): Promise<boolean> => {
+    try {
+        // Delete related records first (feedings, photos, sightings)
+        await supabase.from('cat_feedings').delete().eq('cat_id', id);
+        await supabase.from('cat_photos').delete().eq('cat_id', id);
+        await supabase.from('cat_sightings').delete().eq('cat_id', id);
+
+        // Delete the cat
+        const { error } = await supabase
+            .from('cats')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting cat:', error);
+            return false;
+        }
+
+        console.log('🗑️ Cat deleted successfully:', id);
+        return true;
+    } catch (error) {
+        console.error('Error deleting cat:', error);
+        return false;
+    }
+};
+
 export const uploadCatImage = async (uri: string): Promise<string | null> => {
     try {
         console.log('📷 Reading image from URI:', uri);

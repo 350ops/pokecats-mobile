@@ -3,6 +3,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { VisionOSInlineMenu, type MenuSection } from '@/components/ui/VisionOSMenu';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -237,7 +238,18 @@ export default function ProfileScreen() {
         <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <Image source={avatarSource} style={styles.avatar} />
+                    <View style={styles.avatarContainer}>
+                        <LinearGradient
+                            colors={['#C13584', '#E1306C', '#F77737']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.avatarGradient}
+                        >
+                            <View style={[styles.avatarInner, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
+                                <Image source={avatarSource} style={styles.avatar} />
+                            </View>
+                        </LinearGradient>
+                    </View>
                     <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{user.name}</Text>
                     {!!user.role && <Text style={styles.role}>{user.role}</Text>}
                     <Text style={{ color: isDark ? Colors.glass.textSecondary : Colors.light.icon, marginTop: 5 }}>{session?.user?.email}</Text>
@@ -365,13 +377,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 30,
     },
-    avatar: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        borderWidth: 4,
-        borderColor: Colors.glass.border,
+    avatarContainer: {
         marginBottom: 16,
+    },
+    avatarGradient: {
+        width: 132,
+        height: 132,
+        borderRadius: 66,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarInner: {
+        width: 124,
+        height: 124,
+        borderRadius: 62,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatar: {
+        width: 118,
+        height: 118,
+        borderRadius: 59,
     },
     name: {
         fontSize: 28,

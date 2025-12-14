@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import 'react-native-get-random-values';
 
@@ -45,11 +47,13 @@ export async function uploadCatClip({ localVideoUri, onProgress, durationSeconds
 
     if (onProgress) onProgress(0.3);
 
-    // Read video file as Blob
-    console.log('📹 Reading video file as Blob...');
-    const videoResponse = await fetch(localVideoUri);
-    const videoBlob = await videoResponse.blob();
-    console.log('📹 Video blob created, size:', videoBlob.size);
+    // Read video file as ArrayBuffer via Base64 (Reliable RN approach)
+    console.log('📹 Reading video file as Base64...');
+    const videoBase64 = await FileSystem.readAsStringAsync(localVideoUri, {
+        encoding: 'base64',
+    });
+    const videoData = decode(videoBase64);
+    console.log('📹 Video data decoded, byte length:', videoData.byteLength);
 
     if (onProgress) onProgress(0.5);
 
@@ -57,7 +61,7 @@ export async function uploadCatClip({ localVideoUri, onProgress, durationSeconds
     console.log('⬆️ Uploading video to Supabase...');
     const { error: videoUploadError } = await supabase.storage
         .from(VIDEO_BUCKET)
-        .upload(videoPath, videoBlob, {
+        .upload(videoPath, videoData, {
             contentType: 'video/mp4',
             upsert: true,
         });
@@ -71,14 +75,16 @@ export async function uploadCatClip({ localVideoUri, onProgress, durationSeconds
     if (onProgress) onProgress(0.7);
 
     // Read and upload thumbnail
-    console.log('🖼️ Reading thumbnail as Blob...');
-    const thumbResponse = await fetch(thumbResult.uri);
-    const thumbBlob = await thumbResponse.blob();
+    console.log('🖼️ Reading thumbnail as Base64...');
+    const thumbBase64 = await FileSystem.readAsStringAsync(thumbResult.uri, {
+        encoding: 'base64',
+    });
+    const thumbData = decode(thumbBase64);
 
     console.log('⬆️ Uploading thumbnail to Supabase...');
     const { error: thumbUploadError } = await supabase.storage
         .from(THUMB_BUCKET)
-        .upload(thumbPath, thumbBlob, {
+        .upload(thumbPath, thumbData, {
             contentType: 'image/jpeg',
             upsert: true,
         });

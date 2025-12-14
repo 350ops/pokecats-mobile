@@ -102,8 +102,8 @@ export default function DiscoverScreen() {
             try {
                 const { status } = await Location.requestForegroundPermissionsAsync();
                 if (status === 'granted') {
-                    const location = await Location.getCurrentPositionAsync({ 
-                        accuracy: Location.Accuracy.Balanced 
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced
                     });
                     if (isMounted) {
                         userCoords = {
@@ -344,18 +344,18 @@ const normalizeCat = (cat: any): NormalizedCat => {
     const primaryColor = cat.primaryColor ?? cat.primary_color ?? null;
     const pattern = cat.pattern ?? null;
     const sex = cat.sex ?? 'unknown';
-    
+
     // Format breed/appearance from color and pattern
     let breed = cat.breed ?? 'Mixed';
     if (primaryColor) {
         const colorLabel = primaryColor.charAt(0).toUpperCase() + primaryColor.slice(1);
-        breed = pattern && pattern !== 'unknown' 
+        breed = pattern && pattern !== 'unknown'
             ? `${colorLabel} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`
             : colorLabel;
     } else if (sex && sex !== 'unknown') {
         breed = sex.charAt(0).toUpperCase() + sex.slice(1);
     }
-    
+
     return {
         id: String(cat.id ?? cat.name ?? Math.random()),
         name: cat.name ?? 'Unnamed cat',
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
         marginBottom: GRID_GAP,
     },
     skeletonImage: {
-        height: 160,
+        height: 120,
         backgroundColor: 'rgba(255,255,255,0.05)',
     },
     skeletonLine: {

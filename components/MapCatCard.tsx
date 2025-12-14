@@ -459,8 +459,8 @@ const styles = StyleSheet.create({
     statsBlock: {
         marginTop: 10,
         borderRadius: 16,
-        paddingVertical: 6,
-        paddingHorizontal: 4,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
         gap: 6,
         marginBottom: 8,
     },

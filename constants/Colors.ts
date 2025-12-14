@@ -18,7 +18,7 @@ export const Colors = {
         tabIconSelected: '#67CE67',
     },
     primary: {
-        green: '#FFBF00',
+        green: '#5DC23E',
         blue: '#3F8FF7',
         dark: '#20201E',
         yellow: '#F8D848',

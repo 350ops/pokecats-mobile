@@ -46,7 +46,7 @@ const CURRENT_USER_ID = 42;
 const CARD_HORIZONTAL_MARGIN = 20;
 const CARD_SPACING = 12;
 const CARD_WIDTH = Dimensions.get('window').width - CARD_HORIZONTAL_MARGIN * 2;
-const CAROUSEL_BOTTOM_OFFSET = 110;
+const CAROUSEL_BOTTOM_OFFSET = 95;
 const CARD_MIN_HEIGHT = 240;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 // When we focus the map on a marker we shift the map center slightly south so the marker
@@ -76,7 +76,7 @@ export default function MapScreen() {
     const scrollX = useRef(new Animated.Value(0)).current;
     const primaryTextColor = isDark ? Colors.glass.text : Colors.primary.dark;
     const secondaryTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-    const cardSurface = isDark ? Colors.glass.background : 'rgba(255,255,255,0.9)';
+    const cardSurface = isDark ? Colors.glass.background : 'rgba(255,255,255,0.25)';
     const statSurface = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
 
     useFocusEffect(
@@ -366,9 +366,14 @@ export default function MapScreen() {
                 })}
             </MapView>
 
-            <GlassView style={[styles.catCountPill, { top: insets.top + 12 }]} intensity={70}>
-                <Text style={[styles.catCountText, { color: primaryTextColor }]}>{catCountLabel}</Text>
-            </GlassView>
+            <Pressable
+                style={[styles.catCountPill, { top: insets.top + 12 }]}
+                onPress={() => router.push({ pathname: '/discover', params: { sort: 'distance' } })}
+            >
+                <GlassView style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24 }} intensity={70}>
+                    <Text style={[styles.catCountText, { color: primaryTextColor }]}>{catCountLabel}</Text>
+                </GlassView>
+            </Pressable>
 
             <View style={[styles.topRightButtons, { top: insets.top + 12 }]}>
                 <NativeGlassIconButton
@@ -567,9 +572,8 @@ const styles = StyleSheet.create({
     catCountPill: {
         position: 'absolute',
         left: 20,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
         borderRadius: 24,
+        overflow: 'hidden',
     },
     catCountText: {
         fontWeight: '700',
