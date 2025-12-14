@@ -119,33 +119,51 @@ struct SmallView: View {
         }.count
     }
     
-    // Helper to load image from bundle resources
-    func loadBundleImage(_ name: String) -> UIImage? {
-        guard let url = Bundle.main.url(forResource: name, withExtension: "png"),
-              let data = try? Data(contentsOf: url),
-              let image = UIImage(data: data) else {
-            return nil
-        }
-        return image
-    }
-    
     var body: some View {
         ZStack {
-            // Blue gradient background
+            // Purple/magenta gradient background (matching Figma)
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(red: 0.23, green: 0.56, blue: 0.76),
-                    Color(red: 0.17, green: 0.49, blue: 0.71)
+                    Color(red: 0.80, green: 0.35, blue: 0.68), // #CC59AD - pink/magenta top
+                    Color(red: 0.55, green: 0.20, blue: 0.55)  // #8C3389 - purple bottom
                 ]),
                 startPoint: .top,
                 endPoint: .bottom
             )
             
-            VStack(spacing: 4) {
-                // Header: "X cats nearby"
-                HStack(spacing: 4) {
+            VStack(spacing: 0) {
+                // Cat images cluster (upper area)
+                ZStack {
+                    // White cat (left, largest)
+                    Image("LabCat")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 70, height: 70)
+                        .offset(x: -30, y: 8)
+                    
+                    // Black cat (center, laying down)
+                    Image("LabCat-2")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 50, height: 50)
+                        .offset(x: 0, y: 20)
+                    
+                    // Orange cat (right)
+                    Image("LabCat-1")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 50, height: 50)
+                        .offset(x: 35, y: 0)
+                }
+                .frame(height: 80)
+                .padding(.top, 8)
+                
+                Spacer()
+                
+                // Footer text: "X cats nearby"
+                HStack(spacing: 6) {
                     Text("\(data.totalNearby)")
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: 28, weight: .bold))
                         .foregroundColor(Color(red: 0.75, green: 1.0, blue: 0.0)) // Lime green
                     Text("cats nearby")
                         .font(.system(size: 14, weight: .semibold))
@@ -153,53 +171,17 @@ struct SmallView: View {
                 }
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
-                .padding(.top, 8)
                 
-                Spacer()
-                
-                // Cat images (overlapping)
-                ZStack {
-                    // White cat (back, largest)
-                    if let whiteCat = loadBundleImage("LabCat") {
-                        Image(uiImage: whiteCat)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 65, height: 65)
-                            .offset(x: -18, y: 0)
-                    }
-                    
-                    // Orange cat (middle)
-                    if let orangeCat = loadBundleImage("LabCat-1") {
-                        Image(uiImage: orangeCat)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 45, height: 45)
-                            .offset(x: 22, y: -5)
-                    }
-                    
-                    // Black cat (front, smallest)
-                    if let blackCat = loadBundleImage("LabCat-2") {
-                        Image(uiImage: blackCat)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 50, height: 50)
-                            .offset(x: 5, y: 18)
-                    }
-                }
-                .frame(height: 70)
-                
-                Spacer()
-                
-                // Footer: "X may need food"
+                // "X may need food"
                 HStack(spacing: 4) {
                     Text("\(hungryCount)")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Color(red: 0.75, green: 1.0, blue: 0.0))
                     Text("may need food")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, 12)
             }
             .padding(.horizontal, 8)
         }
