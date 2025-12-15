@@ -23,7 +23,7 @@ type MapCat = {
     id: number;
     name: string;
     image?: string;
-    breed?: string;
+    appearance?: string;
     status?: string;
     locationDescription?: string | null;
     lastFed?: string | Date | null;
@@ -197,7 +197,7 @@ export function MapCatCard({
                                 ]}>{statusState.statusText}</Text>
                             </View>
                         </View>
-                        <Text style={[styles.catBreed, { color: secondaryTextColor }]} numberOfLines={1}>
+                        <Text style={[styles.catAppearance, { color: secondaryTextColor }]} numberOfLines={1}>
                             {formatCatAppearance(item)}
                         </Text>
                     </View>
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
     },
-    catBreed: {
+    catAppearance: {
         fontSize: 14,
         marginTop: 2,
     },

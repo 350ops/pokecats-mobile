@@ -39,7 +39,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mmdev.pokecats"
     },
     "web": {
       "output": "static",
@@ -74,7 +75,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f1a6171e-015e-4e01-a4a8-4a9aa9130da4"
+        "projectId": "f1a6171e-015e-4e01-a4a8-4a9aa9130da4",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.mmdev.pokecats.widget",
+                  "targetName": "widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.mmdev.pokecats"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

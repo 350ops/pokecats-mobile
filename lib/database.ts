@@ -118,7 +118,6 @@ export const addCat = async (
         latitude,
         longitude,
         status: options?.status ?? 'Healthy',
-        breed: 'Unknown',
         last_sighted: new Date().toISOString(),
         tnr_status: options?.tnrStatus ?? false,
         color_profile: options?.colorProfile ?? [],
@@ -390,7 +389,6 @@ export const seedDatabase = async () => {
         const basePayload: any = {
             id: parseInt(cat.id), // CRITICAL: Use stable IDs from MockData
             name: cat.name,
-            breed: cat.breed || 'Unknown',
             status: cat.status,
             description: cat.description,
             image: cat.image,
@@ -426,7 +424,6 @@ export const seedDatabase = async () => {
         const basicPayload = specificCats.map((cat) => ({
             id: parseInt(cat.id), // CRITICAL: Use stable IDs
             name: cat.name,
-            breed: cat.breed || 'Unknown',
             status: cat.status,
             description: cat.description,
             image: cat.image,

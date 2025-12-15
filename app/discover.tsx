@@ -345,22 +345,22 @@ const normalizeCat = (cat: any): NormalizedCat => {
     const pattern = cat.pattern ?? null;
     const sex = cat.sex ?? 'unknown';
 
-    // Format breed/appearance from color and pattern
-    let breed = cat.breed ?? 'Mixed';
+    // Format appearance from color and pattern
+    let appearance = 'Mixed';
     if (primaryColor) {
         const colorLabel = primaryColor.charAt(0).toUpperCase() + primaryColor.slice(1);
-        breed = pattern && pattern !== 'unknown'
+        appearance = pattern && pattern !== 'unknown'
             ? `${colorLabel} ${pattern.charAt(0).toUpperCase() + pattern.slice(1)}`
             : colorLabel;
     } else if (sex && sex !== 'unknown') {
-        breed = sex.charAt(0).toUpperCase() + sex.slice(1);
+        appearance = sex.charAt(0).toUpperCase() + sex.slice(1);
     }
 
     return {
         id: String(cat.id ?? cat.name ?? Math.random()),
         name: cat.name ?? 'Unnamed cat',
         image: cat.image ?? 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=600&q=80',
-        breed,
+        appearance,
         distance: formatDistanceFromMeters(distanceMeters),
         status: (cat.status ?? 'Healthy') as NormalizedCat['status'],
         description: cat.description ?? '',

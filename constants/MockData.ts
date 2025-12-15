@@ -2,7 +2,7 @@ export interface Cat {
     id: string;
     name: string;
     image: string;
-    breed: string;
+    appearance: string;
     distance: string;
     status: 'Healthy' | 'Needs Help' | 'Adopted';
     description: string;
@@ -23,7 +23,7 @@ export const MOCK_CATS: Cat[] = [
         id: '1',
         name: 'Whiskers',
         image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=600&q=80',
-        breed: 'Tabby Mix',
+        appearance: 'Tabby Mix',
         distance: '0.5 km',
         status: 'Healthy',
         description: 'Friendly tabby cat often seen near the park bench. Loves treats.',
@@ -40,7 +40,7 @@ export const MOCK_CATS: Cat[] = [
         id: '2',
         name: 'Luna',
         image: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=600&q=80',
-        breed: 'Black Shorthair',
+        appearance: 'Black Shorthair',
         distance: '1.2 km',
         status: 'Needs Help',
         description: 'Shy black cat, looks a bit thin. Might need treats.',
@@ -57,7 +57,7 @@ export const MOCK_CATS: Cat[] = [
         id: '3',
         name: 'Pancho',
         image: 'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?auto=format&fit=crop&w=600&q=80',
-        breed: 'Orange Tabby',
+        appearance: 'Orange Tabby',
         distance: '0.8 km',
         status: 'Healthy',
         description: 'Very vocal and social. hangs out behind Lulu.',
@@ -72,7 +72,7 @@ export const MOCK_CATS: Cat[] = [
         id: '4',
         name: 'Mittens',
         image: 'https://images.unsplash.com/photo-1511044568932-338cba0fb803?auto=format&fit=crop&w=600&q=80',
-        breed: 'Tuxedo',
+        appearance: 'Tuxedo',
         distance: '2.0 km',
         status: 'Healthy',
         description: 'Wears a red collar but no tag. Friendly with other cats.',
@@ -88,7 +88,7 @@ export const MOCK_CATS: Cat[] = [
         id: '5',
         name: 'Shadow',
         image: 'https://images.unsplash.com/photo-1495360019602-e001c5b09817?auto=format&fit=crop&w=600&q=80',
-        breed: 'Grey Mix',
+        appearance: 'Grey Mix',
         distance: '0.3 km',
         status: 'Adopted',
         description: 'Recently adopted! Just keeping the profile for memory.',
@@ -103,7 +103,7 @@ export const MOCK_CATS: Cat[] = [
         id: '6',
         name: 'Cleo',
         image: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=600&q=80',
-        breed: 'Siamese Mix',
+        appearance: 'Siamese Mix',
         distance: '1.5 km',
         status: 'Healthy',
         description: 'Elegant Siamese with striking blue eyes. Often spotted near the community garden.',
@@ -117,7 +117,7 @@ export const MOCK_CATS: Cat[] = [
         id: '7',
         name: 'Patches',
         image: 'https://images.unsplash.com/photo-1561948955-570b270e7c36?auto=format&fit=crop&w=600&q=80',
-        breed: 'Calico',
+        appearance: 'Calico',
         distance: '0.7 km',
         status: 'Needs Help',
         description: 'Beautiful calico with patches of orange and black. Has a slight limp - needs vet care.',
@@ -132,7 +132,7 @@ export const MOCK_CATS: Cat[] = [
         id: '8',
         name: 'Oliver',
         image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?auto=format&fit=crop&w=600&q=80',
-        breed: 'British Shorthair',
+        appearance: 'British Shorthair',
         distance: '2.5 km',
         status: 'Healthy',
         description: 'Chubby grey cat with round face. Very calm and loves chin scratches.',
@@ -148,7 +148,7 @@ export const MOCK_CATS: Cat[] = [
         id: '9',
         name: 'Bella',
         image: 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&w=600&q=80',
-        breed: 'Persian Mix',
+        appearance: 'Persian Mix',
         distance: '1.0 km',
         status: 'Healthy',
         description: 'Fluffy white cat with a flat face. Usually found sunbathing on windowsills.',

@@ -19,7 +19,7 @@ type MapCat = {
     id: number;
     name: string;
     image?: string;
-    breed?: string;
+    appearance?: string;
     status?: string;
     locationDescription?: string | null;
     lastFed?: string | Date | null;
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontWeight: 'bold',
     },
-    catBreed: {
+    catAppearance: {
         fontSize: 14,
         marginTop: 2,
     },

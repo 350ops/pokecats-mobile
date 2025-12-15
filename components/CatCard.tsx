@@ -15,7 +15,7 @@ interface Cat {
     id: number | string;
     name: string;
     image?: string;
-    breed?: string;
+    appearance?: string;
     status?: string;
     distance?: string;
     lastSighted?: string | Date | null;
@@ -200,8 +200,8 @@ export function CatCard({ cat }: CatCardProps) {
                 <Text style={[styles.name, { color: isDark ? Colors.glass.text : Colors.light.text }]} numberOfLines={1}>
                     {cat.name}
                 </Text>
-                <Text style={[styles.breed, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]} numberOfLines={1}>
-                    {cat.breed}
+                <Text style={[styles.appearance, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]} numberOfLines={1}>
+                    {cat.appearance}
                 </Text>
 
                 {/* New Action Buttons */}
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginTop: 4,
     },
-    breed: {
+    appearance: {
         fontSize: 14,
         marginBottom: 8,
     },

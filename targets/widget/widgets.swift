@@ -92,6 +92,7 @@ struct EmptyStateView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
+        
             
             VStack {
                 Text("🐱")
@@ -121,16 +122,6 @@ struct SmallView: View {
     
     var body: some View {
         ZStack {
-            // Purple/magenta gradient background (matching Figma)
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.80, green: 0.35, blue: 0.68), // #CC59AD - pink/magenta top
-                    Color(red: 0.55, green: 0.20, blue: 0.55)  // #8C3389 - purple bottom
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            
             VStack(spacing: 0) {
                 // Cat images cluster (upper area)
                 ZStack {
@@ -139,21 +130,21 @@ struct SmallView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 70, height: 70)
-                        .offset(x: -30, y: 8)
+                        .offset(x: -20, y: 28)
                     
                     // Black cat (center, laying down)
                     Image("LabCat-2")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 50, height: 50)
-                        .offset(x: 0, y: 20)
+                        .offset(x: 10, y: 40)
                     
                     // Orange cat (right)
                     Image("LabCat-1")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 50, height: 50)
-                        .offset(x: 35, y: 0)
+                        .offset(x: 25, y: 55)
                 }
                 .frame(height: 80)
                 .padding(.top, 8)
@@ -161,69 +152,187 @@ struct SmallView: View {
                 Spacer()
                 
                 // Footer text: "X cats nearby"
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Text("\(data.totalNearby)")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(Color(red: 0.75, green: 1.0, blue: 0.0)) // Lime green
+                        .offset(x: 0, y: -88)
                     Text("cats nearby")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(Color(red: 0.75, green: 1.0, blue: 0.0))
+                        .offset(x: 0, y: -88)
                 }
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
                 
                 // "X may need food"
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Text("\(hungryCount)")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(Color(red: 0.75, green: 1.0, blue: 0.0))
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .offset(x: 0, y: 0)
                     Text("may need food")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
+                        .offset(x: 0, y: 0)
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, 5)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 3)
         }
-        .containerBackground(.clear, for: .widget)
+        .containerBackground(for: .widget) {
+            RadialGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.2549, green: 0.4784, blue: 1.0), // #417AFF
+                    Color(red: 0.0, green: 0.2588, blue: 0.5020)  // #004280
+                ]),
+                center: .center,
+                startRadius: 0,
+                endRadius: 220
+            )
+        }
     }
 }
 
 struct MediumView: View {
     let data: WidgetData
     
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text("🐾 Nearby")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text("\(data.totalNearby)")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(Color(red: 0.2, green: 0.78, blue: 0.35))
-                
-                Text(data.totalNearby == 1 ? "cat found" : "cats found")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+    // Get the closest cat
+    var closestCat: WidgetCat? { data.cats.first }
+    
+    // Format last fed time
+    var lastFedDisplay: (description: String, time: String) {
+        guard let cat = closestCat, let lastFed = cat.lastFed else {
+            return ("Recently", "")
+        }
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: lastFed) else {
+            return ("Unknown", "--:--")
+        }
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm"
+        let time = timeFormatter.string(from: date)
+        
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            let hour = calendar.component(.hour, from: date)
+            if hour < 12 {
+                return ("This morning", time)
+            } else {
+                return ("Today", time)
             }
-            .padding(.trailing)
-            
-            Divider().background(Color.gray)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                if let cat = data.cats.first {
-                    CatRow(cat: cat)
-                    if data.cats.count > 1 {
-                        Text("+\(data.cats.count - 1) more")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+        } else if calendar.isDateInYesterday(date) {
+            return ("Yesterday", time)
+        } else {
+            return ("Days ago", time)
+        }
+    }
+    
+    // Stats
+    var feedingsCount: Int { data.cats.count }
+    var sightingsCount: Int { data.totalNearby }
+    
+    var body: some View {
+        HStack(spacing: -40) {
+            // LEFT: Cat info
+            VStack(alignment: .leading, spacing: 4) {
+                // Cat name
+                Text("\(closestCat?.name ?? "Cat") is nearby")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .padding(.leading, -10)
+                // Distance
+                Text(closestCat?.distance ?? "nearby")
+                    .font(.system(size: 12, weight: .light, design: .rounded))
+                    .foregroundColor(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.3), radius: 5)
+                    .padding(.leading, -5)
+                    .padding(.top, 2)
+                
+                Spacer()
+                
+                // Last Fed section with yellow bar
+                HStack(alignment: .top, spacing: 8) {
+                    // Yellow accent bar
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color(red: 0.95, green: 0.78, blue: 0.0)) // #F2C800
+                        .frame(width: 2, height: 56)
+                        .padding(.leading, -5)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Last Fed")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.leading, -5)
+                      
+                        Text(lastFedDisplay.description)
+                            .font(.system(size: 12, weight: .regular, design: .rounded))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.leading, -5)
+                        Text(lastFedDisplay.time)
+                            .font(.system(size: 12, weight: .regular, design: .rounded))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.leading, -2)
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 16)
+            .padding(.vertical, 12)
+            
+            // CENTER: Cat image
+            Image("LabCat")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 90, height: 110)
+                .padding(.top, 30)
+                .padding(.leading, -120)
+
+            
+            // RIGHT: Stats
+            VStack(alignment: .leading, spacing: 10) {
+                // Feedings
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Feedings")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.95, green: 0.78, blue: 0.0)) // #F2C800
+                        .padding(.leading, 13)
+                    
+                    Text("\(feedingsCount)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.85, green: 0.85, blue: 0.85)) // #D9D9D9
+                        .padding(.leading, 45)
+                }
+                
+                // Sightings
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Sightings")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 1.0, green: 0.42, blue: 0.66)) // #FF6BA8
+                        .padding(.leading, 13)
+
+                    
+                    Text("\(sightingsCount)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.85, green: 0.85, blue: 0.85)) // #D9D9D9
+                        .padding(.leading, 45)
+
+                }
+            }
+            .frame(width: 90)
+            .padding(.trailing, 16)
         }
-        .containerBackground(Color(red: 0.1, green: 0.14, blue: 0.2), for: .widget)
+        .containerBackground(for: .widget) {
+            RadialGradient(
+                gradient: Gradient(colors: [
+                    Color(red: 0.2549, green: 0.4784, blue: 1.0), // #417AFF
+                    Color(red: 0.0, green: 0.2588, blue: 0.5020)  // #004280
+                ]),
+                center: .center,
+                startRadius: 0,
+                endRadius: 220
+            )
+        }
     }
 }
 
