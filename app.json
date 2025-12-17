@@ -2,7 +2,7 @@
   "expo": {
     "name": "PokeCats",
     "slug": "pokecats",
-    "version": "1.1",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tempapp",
@@ -12,7 +12,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.mmdev.pokecats",
-      "buildNumber": "1.1.0",
+      "buildNumber": "1.2.0",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "This app uses the camera to take photos of cats.",
@@ -31,7 +31,7 @@
       }
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
