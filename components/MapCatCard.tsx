@@ -1,6 +1,7 @@
 import { GlassView } from '@/components/ui/GlassView';
 import { formatCatAppearance } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { addCatPhoto, addSighting, getCatPhotos, updateCat, uploadCatImage } from '@/lib/database';
 import * as Haptics from 'expo-haptics';
@@ -80,6 +81,7 @@ export function MapCatCard({
     statSurface
 }: MapCatCardProps) {
     const { isDark } = useTheme();
+    const { t } = useLanguage();
     const [photos, setPhotos] = useState<string[]>(item.image ? [item.image] : []);
     const [uploading, setUploading] = useState(false);
     const [lastSighted, setLastSighted] = useState(item.lastSighted);
@@ -213,7 +215,9 @@ export function MapCatCard({
                                 style={styles.carousel}
                             />
                         ) : (
-                            <Image source={CAT_FALLBACK} style={styles.avatar} />
+                            <View style={[styles.avatar, styles.noPhotoPlaceholder]}>
+                                <SymbolView name="cat.fill" size={48} tintColor={secondaryTextColor} />
+                            </View>
                         )}
                         {uploading && (
                             <View style={[styles.avatar, styles.loaderOverlay]}>
@@ -252,7 +256,7 @@ export function MapCatCard({
                 <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>
                     <StatRow
                         icon="fork.knife"
-                        label="Last Fed"
+                        label={t.catCard.lastFed}
                         value={getTimeAgo(item.lastFed)}
                         tint={statusState.markerColor === 'green' ? '#34C759' : statusState.markerColor === 'orange' ? '#F4B63E' : '#FF6B6B'}
                         valueColor={primaryTextColor}
@@ -260,7 +264,7 @@ export function MapCatCard({
                     />
                     <StatRow
                         icon="eye.fill"
-                        label="Seen"
+                        label={t.catCard.seen}
                         value={getTimeAgo(lastSighted)}
                         tint="#32D74B"
                         valueColor={primaryTextColor}
@@ -268,8 +272,8 @@ export function MapCatCard({
                     />
                     <StatRow
                         icon={item.tnrStatus ? 'checkmark.shield.fill' : 'exclamationmark.shield.fill'}
-                        label="TNR"
-                        value={item.tnrStatus ? 'Neutered' : 'Not Neutered'}
+                        label={t.catCard.tnr}
+                        value={item.tnrStatus ? t.catCard.neutered : t.catCard.notNeutered}
                         tint={Colors.primary.blue}
                         valueColor={primaryTextColor}
                         dynamicLabelColor={primaryTextColor}
@@ -280,7 +284,7 @@ export function MapCatCard({
                 <View style={styles.actionsRow}>
                     <MapActionButton
                         icon="eye.fill"
-                        label="Seen"
+                        label={t.actions.seen}
                         onPress={handleSeen}
                         textColor={primaryTextColor}
                         iconColor="#32D74B"
@@ -288,7 +292,7 @@ export function MapCatCard({
                     />
                     <MapActionButton
                         icon="pencil"
-                        label="Edit"
+                        label={t.actions.edit}
                         onPress={() => router.push(`/cat/${item.id}/edit`)}
                         textColor={primaryTextColor}
                         iconColor={secondaryTextColor}
@@ -296,7 +300,7 @@ export function MapCatCard({
                     />
                     <MapActionButton
                         icon="camera.fill"
-                        label="Photo"
+                        label={t.actions.photo}
                         onPress={handlePhoto}
                         textColor={primaryTextColor}
                         iconColor={secondaryTextColor}
@@ -322,7 +326,7 @@ export function MapCatCard({
                     />
                     <MapActionButton
                         icon="location.fill"
-                        label="Go"
+                        label={t.actions.go}
                         onPress={onNavigate}
                         textColor={primaryTextColor}
                         iconColor={primaryTextColor}
@@ -434,6 +438,11 @@ const styles = StyleSheet.create({
         left: 0,
         zIndex: 10,
         backgroundColor: 'rgba(0,0,0,0.5)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    noPhotoPlaceholder: {
+        backgroundColor: 'rgba(128,128,128,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
     },

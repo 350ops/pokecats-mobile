@@ -3,6 +3,7 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { CAT_COLORS, CAT_PATTERNS, CatColor, CatPattern } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { deleteCat, getCat, updateCat, uploadCatImage } from '@/lib/database';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,6 +55,7 @@ export default function EditCatScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isDark } = useTheme();
+    const { t } = useLanguage();
 
     const backgroundColor = isDark ? Colors.primary.dark : Colors.light.background;
     const textColor = isDark ? Colors.glass.text : Colors.light.text;
@@ -294,14 +296,16 @@ export default function EditCatScreen() {
         );
     };
 
-    const selectedColorLabel = CAT_COLORS.find(c => c.value === primaryColor)?.label;
-    const selectedPatternLabel = CAT_PATTERNS.find(p => p.value === pattern)?.label;
+    const selectedColorKey = CAT_COLORS.find(c => c.value === primaryColor)?.labelKey;
+    const selectedPatternKey = CAT_PATTERNS.find(p => p.value === pattern)?.labelKey;
+    const selectedColorLabel = selectedColorKey ? (t.colors as Record<string, string>)[selectedColorKey] : undefined;
+    const selectedPatternLabel = selectedPatternKey ? (t.patterns as Record<string, string>)[selectedPatternKey] : undefined;
 
     if (loading) {
         return (
             <View style={[styles.container, { backgroundColor, justifyContent: 'center', alignItems: 'center' }]}>
                 <Stack.Screen options={{
-                    title: 'Edit Cat',
+                    title: t.editCat.title,
                     presentation: 'modal',
                     headerTintColor: Colors.primary.blue,
                 }} />
@@ -326,7 +330,7 @@ export default function EditCatScreen() {
             >
                 {/* Photo */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Photo</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.photo}</Text>
                     <Pressable onPress={pickImage} style={[styles.inputBox, { borderColor: inputBorder }]}>
                         {(newImageUri || image) ? (
                             <Image source={{ uri: newImageUri || image || undefined }} style={styles.photoPreview} />
@@ -334,7 +338,7 @@ export default function EditCatScreen() {
                             <View style={styles.photoPlaceholder}>
                                 <SymbolView name="photo.on.rectangle" size={40} tintColor={secondaryTextColor} />
                                 <Text style={[styles.photoPlaceholderText, { color: secondaryTextColor }]}>
-                                    Tap to select photo
+                                    {t.editCat.tapToSelectPhoto}
                                 </Text>
                             </View>
                         )}
@@ -343,10 +347,10 @@ export default function EditCatScreen() {
 
                 {/* Name */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Name *</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.name}</Text>
                     <TextInput
                         style={[styles.textInput, { backgroundColor: inputBg, borderColor: inputBorder, color: textColor }]}
-                        placeholder="Enter cat's name"
+                        placeholder={t.editCat.enterName}
                         placeholderTextColor={secondaryTextColor}
                         value={name}
                         onChangeText={setName}
@@ -355,7 +359,7 @@ export default function EditCatScreen() {
 
                 {/* Main Fur Color */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Main Fur Color</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.mainFurColor}</Text>
                     <Pressable
                         onPress={() => setColorPickerOpen(true)}
                         style={[styles.selectBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
@@ -368,7 +372,7 @@ export default function EditCatScreen() {
                                 <Text style={[styles.selectText, { color: textColor }]}>{selectedColorLabel}</Text>
                             </View>
                         ) : (
-                            <Text style={[styles.selectText, { color: secondaryTextColor }]}>Select color</Text>
+                            <Text style={[styles.selectText, { color: secondaryTextColor }]}>{t.editCat.selectColor}</Text>
                         )}
                         <SymbolView name="chevron.down" size={16} tintColor={secondaryTextColor} />
                     </Pressable>
@@ -376,13 +380,13 @@ export default function EditCatScreen() {
 
                 {/* Fur Pattern */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Fur Pattern</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.furPattern}</Text>
                     <Pressable
                         onPress={() => setPatternPickerOpen(true)}
                         style={[styles.selectBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
                     >
                         <Text style={[styles.selectText, { color: pattern ? textColor : secondaryTextColor }]}>
-                            {selectedPatternLabel || 'Select pattern'}
+                            {selectedPatternLabel || t.editCat.selectPattern}
                         </Text>
                         <SymbolView name="chevron.down" size={16} tintColor={secondaryTextColor} />
                     </Pressable>
@@ -390,7 +394,7 @@ export default function EditCatScreen() {
 
                 {/* Sex */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Sex</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.sex}</Text>
                     <View style={styles.segmentedControl}>
                         {SEX_OPTIONS.map((option) => (
                             <Pressable
@@ -412,7 +416,7 @@ export default function EditCatScreen() {
 
                 {/* Age */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Approximate Age</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.approximateAge}</Text>
                     <View style={styles.segmentedControl}>
                         {AGE_OPTIONS.map((option) => (
                             <Pressable
@@ -434,7 +438,7 @@ export default function EditCatScreen() {
 
                 {/* Location */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Location</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.location}</Text>
                     <Pressable
                         onPress={() => setLocationSheetVisible(true)}
                         style={[styles.locationBox, { backgroundColor: inputBg, borderColor: inputBorder }]}
@@ -444,7 +448,7 @@ export default function EditCatScreen() {
                             {location ? (
                                 <>
                                     <Text style={[styles.locationText, { color: textColor }]}>
-                                        {address || 'Location set'}
+                                        {address || t.editCat.locationSet}
                                     </Text>
                                     <Text style={[styles.locationCoords, { color: secondaryTextColor }]}>
                                         {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
@@ -452,7 +456,7 @@ export default function EditCatScreen() {
                                 </>
                             ) : (
                                 <Text style={[styles.locationText, { color: secondaryTextColor }]}>
-                                    Tap to set location on map
+                                    {t.editCat.tapToSetLocation}
                                 </Text>
                             )}
                         </View>
@@ -462,7 +466,7 @@ export default function EditCatScreen() {
 
                 {/* Status Badges */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Status</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.status}</Text>
                     <View style={styles.chipGrid}>
                         {STATUS_BADGES.map((badge) => {
                             const active = selectedBadges.includes(badge.id);
@@ -492,15 +496,15 @@ export default function EditCatScreen() {
 
                 {/* Notes */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>Notes</Text>
-                    <Text style={[styles.helperText, { color: secondaryTextColor }]}>Health, behavior, or identification details</Text>
+                    <Text style={[styles.sectionLabel, { color: secondaryTextColor }]}>{t.editCat.notes}</Text>
+                    <Text style={[styles.helperText, { color: secondaryTextColor }]}>{t.editCat.notesHelper}</Text>
                     <TextInput
                         style={[
                             styles.textInput,
                             styles.multilineInput,
                             { backgroundColor: inputBg, borderColor: inputBorder, color: textColor },
                         ]}
-                        placeholder="e.g., Visible limp, friendly, ear tipped..."
+                        placeholder={t.editCat.notesPlaceholder}
                         placeholderTextColor={secondaryTextColor}
                         multiline
                         numberOfLines={4}
@@ -512,7 +516,7 @@ export default function EditCatScreen() {
 
                 {/* Gallery Section */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionLabel, { color: textColor }]}>Additional Photos</Text>
+                    <Text style={[styles.sectionLabel, { color: textColor }]}>{t.editCat.additionalPhotos}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
                         {photos.map((photo, index) => (
                             <View key={index} style={{ marginRight: 10, position: 'relative' }}>
@@ -537,7 +541,7 @@ export default function EditCatScreen() {
                             }}
                         >
                             <SymbolView name="plus" size={24} tintColor={Colors.primary.blue} />
-                            <Text style={{ color: Colors.primary.blue, fontSize: 12, marginTop: 4 }}>Add Photo</Text>
+                            <Text style={{ color: Colors.primary.blue, fontSize: 12, marginTop: 4 }}>{t.editCat.addPhoto}</Text>
                         </Pressable>
                     </ScrollView>
                 </View>
@@ -560,9 +564,9 @@ export default function EditCatScreen() {
                             tintColor={needsAttention ? '#FF6B6B' : secondaryTextColor}
                         />
                         <View>
-                            <Text style={[styles.attentionTitle, { color: textColor }]}>Needs Attention?</Text>
+                            <Text style={[styles.attentionTitle, { color: textColor }]}>{t.editCat.needsAttention}</Text>
                             <Text style={[styles.attentionSubtitle, { color: secondaryTextColor }]}>
-                                This cat may need help
+                                {t.editCat.needsAttentionSubtitle}
                             </Text>
                         </View>
                     </View>
@@ -581,7 +585,7 @@ export default function EditCatScreen() {
             {/* Submit Button */}
             <View style={[styles.submitContainer, { paddingBottom: insets.bottom + 16 }]}>
                 <GlassButton
-                    title={saving ? 'Saving...' : 'Save Changes'}
+                    title={saving ? t.editCat.saving : t.editCat.saveChanges}
                     icon="checkmark.circle.fill"
                     variant="primary"
                     onPress={handleSave}
@@ -598,7 +602,7 @@ export default function EditCatScreen() {
                     ) : (
                         <>
                             <SymbolView name="trash.fill" size={16} tintColor="#FF6B6B" />
-                            <Text style={styles.deleteButtonText}>Delete Cat</Text>
+                            <Text style={styles.deleteButtonText}>{t.editCat.deleteCat}</Text>
                         </>
                     )}
                 </Pressable>
@@ -636,7 +640,7 @@ export default function EditCatScreen() {
                                 >
                                     <View style={styles.pickerRowContent}>
                                         <View style={[styles.colorDot, { backgroundColor: color.hex ?? '#ccc' }]} />
-                                        <Text style={[styles.pickerRowText, { color: textColor }]}>{color.label}</Text>
+                                        <Text style={[styles.pickerRowText, { color: textColor }]}>{(t.colors as Record<string, string>)[color.labelKey]}</Text>
                                     </View>
                                     {primaryColor === color.value && (
                                         <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
@@ -678,7 +682,7 @@ export default function EditCatScreen() {
                                         pressed && { opacity: 0.8 },
                                     ]}
                                 >
-                                    <Text style={[styles.pickerRowText, { color: textColor }]}>{p.label}</Text>
+                                    <Text style={[styles.pickerRowText, { color: textColor }]}>{(t.patterns as Record<string, string>)[p.labelKey]}</Text>
                                     {pattern === p.value && (
                                         <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
                                     )}

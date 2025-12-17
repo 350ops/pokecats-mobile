@@ -3,6 +3,7 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { CAT_COLORS, CAT_PATTERNS, CatColor, CatPattern } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { submitQuickReport } from '@/lib/database';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -14,6 +15,7 @@ import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Image,
     KeyboardAvoidingView,
     Modal,
@@ -53,6 +55,7 @@ const AGE_OPTIONS: { value: CatAge; label: string }[] = [
 export default function ReportScreen() {
     const insets = useSafeAreaInsets();
     const { isDark } = useTheme();
+    const { t } = useLanguage();
     const router = useRouter();
 
     // Form state
@@ -184,19 +187,31 @@ export default function ReportScreen() {
                 needsAttention,
             });
 
-            alert('Cat profile created successfully!');
-            router.back();
+            // Show different message based on whether photo was uploaded
+            if (!photo) {
+                Alert.alert(
+                    'Cat Profile Created!',
+                    'Remember to add a photo later to help others identify this cat.',
+                    [{ text: 'OK', onPress: () => router.back() }]
+                );
+            } else {
+                Alert.alert('Success', 'Cat profile created successfully!', [
+                    { text: 'OK', onPress: () => router.back() }
+                ]);
+            }
         } catch (error) {
             console.error(error);
-            alert('Failed to create cat profile. Please try again.');
+            Alert.alert('Error', 'Failed to create cat profile. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
     const isInjured = selectedBadges.includes('injured');
-    const selectedColorLabel = CAT_COLORS.find(c => c.value === primaryColor)?.label;
-    const selectedPatternLabel = CAT_PATTERNS.find(p => p.value === pattern)?.label;
+    const selectedColorKey = CAT_COLORS.find(c => c.value === primaryColor)?.labelKey;
+    const selectedPatternKey = CAT_PATTERNS.find(p => p.value === pattern)?.labelKey;
+    const selectedColorLabel = selectedColorKey ? (t.colors as Record<string, string>)[selectedColorKey] : undefined;
+    const selectedPatternLabel = selectedPatternKey ? (t.patterns as Record<string, string>)[selectedPatternKey] : undefined;
 
     return (
         <KeyboardAvoidingView
@@ -519,7 +534,7 @@ export default function ReportScreen() {
                                         {color.hex && (
                                             <View style={[styles.colorDot, { backgroundColor: color.hex }]} />
                                         )}
-                                        <Text style={[styles.pickerRowText, { color: textColor }]}>{color.label}</Text>
+                                        <Text style={[styles.pickerRowText, { color: textColor }]}>{(t.colors as Record<string, string>)[color.labelKey]}</Text>
                                     </View>
                                     {primaryColor === color.value && (
                                         <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
@@ -577,7 +592,7 @@ export default function ReportScreen() {
                                         pressed && { opacity: 0.8 },
                                     ]}
                                 >
-                                    <Text style={[styles.pickerRowText, { color: textColor }]}>{p.label}</Text>
+                                    <Text style={[styles.pickerRowText, { color: textColor }]}>{(t.patterns as Record<string, string>)[p.labelKey]}</Text>
                                     {pattern === p.value && (
                                         <SymbolView name="checkmark" size={18} tintColor={Colors.primary.blue} />
                                     )}

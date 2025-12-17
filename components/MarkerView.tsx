@@ -38,9 +38,15 @@ export function MarkerView({
 
     const dotSize = size;
     const haloSize = dotSize + 8;
+    // Explicit dimensions help react-native-maps render custom markers correctly
+    const wrapperSize = haloSize + 10;
 
     return (
-        <View style={styles.wrapper} pointerEvents="none" testID={markerId}>
+        <View
+            style={[styles.wrapper, { width: wrapperSize, height: wrapperSize }]}
+            pointerEvents="none"
+            testID={markerId}
+        >
             {/* Ground shadow */}
             <View style={[styles.shadow, { width: haloSize * 0.9 }]} />
 

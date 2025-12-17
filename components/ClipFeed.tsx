@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { addClipComment, EnrichedClip, fetchClipPage, toggleClipLike } from '@/lib/catClips';
 import { useFocusEffect } from 'expo-router';
@@ -27,6 +28,7 @@ function ClipCard({
     onCommentChange: (text: string) => void;
 }) {
     const { isDark } = useTheme();
+    const { t } = useLanguage();
     const textColor = isDark ? Colors.glass.text : Colors.primary.dark;
     const subTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
     const cardSurface = isDark ? Colors.glass.background : '#f5f7fb';
@@ -51,7 +53,7 @@ function ClipCard({
             ) : null}
             <View style={styles.cardContent}>
                 <View style={styles.row}>
-                    <Text style={[styles.title, { color: textColor }]}>Clip</Text>
+                    <Text style={[styles.title, { color: textColor }]}>{t.clips.clip}</Text>
                     <Text style={[styles.meta, { color: subTextColor }]}>{item.duration}s • {new Date(item.created_at).toLocaleString()}</Text>
                 </View>
 
@@ -75,7 +77,7 @@ function ClipCard({
 
                 <View style={styles.commentRow}>
                     <TextInput
-                        placeholder="Add a comment"
+                        placeholder={t.common.addComment}
                         placeholderTextColor={subTextColor}
                         style={[styles.commentInput, { color: textColor, borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}
                         value={commentDraft}

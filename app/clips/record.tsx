@@ -24,10 +24,19 @@ export default function RecordClipScreen() {
 
     const handleUpload = async () => {
         try {
+            // Request media library permissions first
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permission Needed', 'Media library access is required to upload videos.');
+                router.back();
+                return;
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
+                mediaTypes: ['videos'],
+                allowsEditing: false,
                 quality: 1,
+                videoMaxDuration: 60,
             });
 
             if (result.canceled) {

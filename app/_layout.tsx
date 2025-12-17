@@ -1,4 +1,5 @@
 import { Colors } from '@/constants/Colors';
+import { LanguageProvider } from '@/context/LanguageContext';
 import { AppThemeProvider, useTheme } from '@/context/ThemeContext';
 import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
@@ -129,7 +130,9 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <AppThemeProvider>
-      <RootLayoutContent />
+      <LanguageProvider>
+        <RootLayoutContent />
+      </LanguageProvider>
     </AppThemeProvider>
   );
 }

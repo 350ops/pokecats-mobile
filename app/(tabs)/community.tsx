@@ -338,8 +338,15 @@ export default function CommunityScreen() {
                         <View style={styles.catRow}>
                             {item.cats.map((cat) => (
                                 <Link key={cat.id} href={`/cat/${cat.id}`} asChild>
-                                    <Pressable style={[styles.catPill, cat.isMine && styles.catPillMine]}>
-                                        <Text style={styles.catPillText}>{cat.name}</Text>
+                                    <Pressable style={[
+                                        styles.catPill,
+                                        { backgroundColor: isDark ? 'rgba(99,179,237,0.25)' : 'rgba(63,143,247,0.15)' },
+                                        cat.isMine && styles.catPillMine
+                                    ]}>
+                                        <Text style={[
+                                            styles.catPillText,
+                                            { color: isDark ? '#63B3ED' : '#3F8FF7' }
+                                        ]}>{cat.name}</Text>
                                     </Pressable>
                                 </Link>
                             ))}

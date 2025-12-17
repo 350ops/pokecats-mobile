@@ -1,30 +1,31 @@
 // Cat appearance constants for color and pattern selection
+// Note: labelKey is used for i18n lookup
 
 export const CAT_COLORS = [
-    { value: 'black', label: 'Black', hex: '#1a1a1a' },
-    { value: 'white', label: 'White', hex: '#f5f5f5' },
-    { value: 'grey', label: 'Grey', hex: '#808080' },
-    { value: 'brown', label: 'Brown', hex: '#8B4513' },
-    { value: 'orange', label: 'Orange (Ginger)', hex: '#FF8C00' },
-    { value: 'cream', label: 'Cream', hex: '#FFFDD0' },
-    { value: 'mixed', label: 'Mixed / Multicolour', hex: null },
+    { value: 'black', labelKey: 'black', hex: '#1a1a1a' },
+    { value: 'white', labelKey: 'white', hex: '#f5f5f5' },
+    { value: 'grey', labelKey: 'grey', hex: '#808080' },
+    { value: 'brown', labelKey: 'brown', hex: '#8B4513' },
+    { value: 'orange', labelKey: 'orange', hex: '#FF8C00' },
+    { value: 'cream', labelKey: 'cream', hex: '#FFFDD0' },
+    { value: 'mixed', labelKey: 'mixed', hex: null },
 ] as const;
 
 export const CAT_PATTERNS = [
-    { value: 'solid', label: 'Solid' },
-    { value: 'tabby', label: 'Tabby (Striped)' },
-    { value: 'spotted', label: 'Spotted' },
-    { value: 'bicolour', label: 'Bicolour (Two colors)' },
-    { value: 'calico', label: 'Calico' },
-    { value: 'tortoiseshell', label: 'Tortoiseshell' },
-    { value: 'pointed', label: 'Pointed (Siamese-like)' },
-    { value: 'unknown', label: 'Unknown' },
+    { value: 'solid', labelKey: 'solid' },
+    { value: 'tabby', labelKey: 'tabby' },
+    { value: 'spotted', labelKey: 'spotted' },
+    { value: 'bicolour', labelKey: 'bicolor' },
+    { value: 'calico', labelKey: 'calico' },
+    { value: 'tortoiseshell', labelKey: 'tortoiseshell' },
+    { value: 'pointed', labelKey: 'pointed' },
+    { value: 'unknown', labelKey: 'unknown' },
 ] as const;
 
 export type CatColor = typeof CAT_COLORS[number]['value'];
 export type CatPattern = typeof CAT_PATTERNS[number]['value'];
 
-// Helper to get label from value
+// Helper to get label from value (fallback for non-i18n contexts)
 export const getColorLabel = (color: string) => {
     return color.charAt(0).toUpperCase() + color.slice(1);
 };
@@ -43,3 +44,4 @@ export const formatCatAppearance = (cat: { primaryColor?: string | null; pattern
     }
     return parts.join(' • ');
 };
+

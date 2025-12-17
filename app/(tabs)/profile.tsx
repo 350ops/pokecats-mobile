@@ -2,11 +2,12 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { StatCard } from '@/components/ui/StatCard';
 import { VisionOSInlineMenu, type MenuSection } from '@/components/ui/VisionOSMenu';
 import { Colors } from '@/constants/Colors';
+import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { Alert, Image, Linking, Platform, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { supabase } from '@/lib/supabase';
 import placeholderAvatar from '@/userPlaceholder.png';
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 export default function ProfileScreen() {
     const [session, setSession] = useState<Session | null>(null);
     const { isDark, preference, setPreference } = useTheme();
+    const { language, setLanguage, t } = useLanguage();
     const router = useRouter();
 
     useEffect(() => {
@@ -161,6 +163,31 @@ export default function ProfileScreen() {
         setPreference(value ? 'dark' : 'light');
     };
 
+    const handleLanguagePress = () => {
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: [t.common.cancel, t.common.english, t.common.spanish],
+                    cancelButtonIndex: 0,
+                },
+                (buttonIndex) => {
+                    if (buttonIndex === 1) setLanguage('en');
+                    else if (buttonIndex === 2) setLanguage('es');
+                }
+            );
+        } else {
+            Alert.alert(
+                t.profile.language,
+                '',
+                [
+                    { text: t.common.english, onPress: () => setLanguage('en') },
+                    { text: t.common.spanish, onPress: () => setLanguage('es') },
+                    { text: t.common.cancel, style: 'cancel' },
+                ]
+            );
+        }
+    };
+
     const user = useMemo(() => ({
         name: session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || '',
         role: session?.user?.user_metadata?.role || '',
@@ -184,55 +211,55 @@ export default function ProfileScreen() {
     const preferenceSections: MenuSection[] = useMemo(() => [
         {
             id: 'account',
-            title: 'Account',
+            title: t.profile.account,
             items: [
                 {
                     id: 'edit-profile',
-                    title: 'Edit Profile',
-                    subtitle: 'Update name, email, and area',
+                    title: t.profile.editProfile,
+                    subtitle: t.profile.editProfileSubtitle,
                     icon: 'person.crop.circle',
                     rightIcon: 'chevron.right',
                     onPress: () => router.push('/profile/edit'),
                 },
                 {
                     id: 'privacy',
-                    title: 'Privacy',
-                    subtitle: 'Control who sees your activity',
+                    title: t.profile.privacy,
+                    subtitle: t.profile.privacySubtitle,
                     icon: 'lock.shield',
                     rightIcon: 'chevron.right',
-                    onPress: () => Alert.alert('Coming Soon', 'Privacy settings will be available in a future update.'),
+                    onPress: () => Alert.alert(t.profile.comingSoon, t.profile.privacyComingSoon),
                 },
             ],
         },
         {
             id: 'app',
-            title: 'App Settings',
+            title: t.profile.appSettings,
             items: [
                 {
                     id: 'system-settings',
-                    title: 'System Settings',
-                    subtitle: 'Manage permissions in iOS Settings',
+                    title: t.profile.systemSettings,
+                    subtitle: t.profile.systemSettingsSubtitle,
                     icon: 'gear',
                     rightIcon: 'arrow.up.right',
                     onPress: openSystemSettings,
                 },
                 {
                     id: 'help',
-                    title: 'Help & Support',
+                    title: t.profile.helpSupport,
                     icon: 'questionmark.circle',
                     rightIcon: 'chevron.right',
-                    onPress: () => Alert.alert('Help', 'Contact us at support@pokecats.app'),
+                    onPress: () => Alert.alert('Help', t.profile.helpMessage),
                 },
                 {
                     id: 'about',
-                    title: 'About PokéCats',
+                    title: t.profile.about,
                     icon: 'info.circle',
-                    rightText: 'v1.0.1',
-                    onPress: () => Alert.alert('PokéCats', 'Version 1.0.1\n\nHelping communities care for stray cats.'),
+                    rightText: 'v1.2.0',
+                    onPress: () => Alert.alert('PokéCats', `${t.profile.version} 1.2.0\n\n${t.profile.aboutMessage}`),
                 },
             ],
         },
-    ], [openSystemSettings]);
+    ], [openSystemSettings, t, router]);
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? Colors.primary.dark : Colors.light.background }]}>
@@ -264,28 +291,28 @@ export default function ProfileScreen() {
                     <View style={styles.statColumn}>
                         <StatCard
                             value={user.stats.sightings}
-                            label="Sightings"
+                            label={t.profile.sightings}
                             gradientColors={['#2a69df', '#4dc7ff']}
                         />
                     </View>
                     <View style={styles.statColumn}>
                         <StatCard
                             value={user.stats.fed}
-                            label="Times Fed"
+                            label={t.profile.timesFed}
                             gradientColors={['#d8a700', '#f8c109']}
                         />
                     </View>
                     <View style={styles.statColumn}>
                         <StatCard
                             value={user.stats.clips}
-                            label="Clips"
+                            label={t.profile.clips}
                             gradientColors={['#af4397', '#cf4485']}
                         />
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>Preferences</Text>
+                    <Text style={[styles.sectionTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>{t.profile.preferences}</Text>
 
                     <VisionOSInlineMenu
                         sections={preferenceSections}
@@ -297,10 +324,10 @@ export default function ProfileScreen() {
                         <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
                             <View style={styles.toggleInfo}>
                                 <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
-                                    Notifications
+                                    {t.profile.notifications}
                                 </Text>
                                 <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                                    {notificationsEnabled ? t.common.enabled : t.common.disabled}
                                 </Text>
                             </View>
                             <Switch
@@ -315,10 +342,10 @@ export default function ProfileScreen() {
                         <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
                             <View style={styles.toggleInfo}>
                                 <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
-                                    Location Access
+                                    {t.profile.locationAccess}
                                 </Text>
                                 <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    {locationEnabled ? 'Enabled' : 'Disabled'}
+                                    {locationEnabled ? t.common.enabled : t.common.disabled}
                                 </Text>
                             </View>
                             <Switch
@@ -333,10 +360,10 @@ export default function ProfileScreen() {
                         <View style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
                             <View style={styles.toggleInfo}>
                                 <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
-                                    Dark Mode
+                                    {t.profile.darkMode}
                                 </Text>
                                 <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                                    {darkModeEnabled ? 'On' : 'Off'}
+                                    {darkModeEnabled ? t.common.on : t.common.off}
                                 </Text>
                             </View>
                             <Switch
@@ -347,11 +374,26 @@ export default function ProfileScreen() {
                                 ios_backgroundColor="rgba(120,120,128,0.32)"
                             />
                         </View>
+
+                        <Pressable
+                            style={[styles.toggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                            onPress={handleLanguagePress}
+                        >
+                            <View style={styles.toggleInfo}>
+                                <Text style={[styles.toggleTitle, { color: isDark ? Colors.glass.text : Colors.light.text }]}>
+                                    {t.profile.language}
+                                </Text>
+                                <Text style={[styles.toggleSubtitle, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
+                                    {language === 'es' ? t.common.spanish : t.common.english}
+                                </Text>
+                            </View>
+                            <Text style={{ color: Colors.primary.blue, fontSize: 15 }}>›</Text>
+                        </Pressable>
                     </View>
                 </View>
 
                 <GlassButton
-                    title="Log Out"
+                    title={t.profile.logOut}
                     variant="glass"
                     style={styles.logoutBtn}
                     onPress={handleLogout}

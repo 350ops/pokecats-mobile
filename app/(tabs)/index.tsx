@@ -440,12 +440,7 @@ export default function MapScreen() {
                                 }}
                                 testID={`marker-${cat.id}`}
                                 style={{ zIndex: isSelected ? 999 : 1 }}
-                            // Anchor at bottom center (where the pin tip is)
-                            // Default is (0.5, 0.5). For a pin, we want (0.5, 1.0) usually?
-                            // My MarkerView has `marginBottom: SIZE/2` to shift it up visually.
-                            // So (0.5, 0.5) might work if the visual center is the middle of the bounding box?
-                            // Let's rely on standard centering and the generic styling first.
-                            // Actually, standard pins need `anchor={{ x: 0.5, y: 1 }}` but I'll check my styling.
+                                tracksViewChanges={true}
                             >
                                 <MarkerView
                                     color={statusState.markerColor}
