@@ -231,8 +231,8 @@ export function CatCard({ cat }: CatCardProps) {
                         popupColor="#FF6B6B"
                         onPress={handleFeed}
                         isActive={isFeeding}
-                        iconColor={isDark ? '#FF6B6B' : '#E05858'}
-                        backgroundColor={isDark ? 'rgba(255, 107, 107, 0.15)' : 'rgba(255, 107, 107, 0.1)'}
+                        iconColor={isDark ? '#E058AE' : '#E058AE'}
+                        backgroundColor={isDark ? 'rgba(163, 13, 133, 0.89)' : 'rgba(203, 23, 173, 0.79)'}
                     />
                     <AnimatedActionButton
                         style={styles.actionButton}

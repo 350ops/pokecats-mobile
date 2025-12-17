@@ -2,13 +2,13 @@ import { GlassView } from '@/components/ui/GlassView';
 import { formatCatAppearance } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { addCatPhoto, addSighting, getCatPhotos, uploadCatImage } from '@/lib/database';
+import { addCatPhoto, addSighting, getCatPhotos, updateCat, uploadCatImage } from '@/lib/database';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
     Easing,
     useAnimatedStyle,
@@ -141,12 +141,59 @@ export function MapCatCard({
         }
     };
 
+    const handleSetPrimaryPhoto = (photoUrl: string) => {
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['Cancel', 'Set as Main Photo'],
+                    cancelButtonIndex: 0,
+                },
+                async (buttonIndex) => {
+                    if (buttonIndex === 1) {
+                        try {
+                            await updateCat(item.id, { image: photoUrl });
+                            // Move this photo to the front
+                            setPhotos(prev => [photoUrl, ...prev.filter(p => p !== photoUrl)]);
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        } catch (error) {
+                            Alert.alert('Error', 'Failed to set primary photo.');
+                        }
+                    }
+                }
+            );
+        } else {
+            Alert.alert(
+                'Set as Main Photo',
+                'Use this photo as the main profile picture?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Set as Main',
+                        onPress: async () => {
+                            try {
+                                await updateCat(item.id, { image: photoUrl });
+                                setPhotos(prev => [photoUrl, ...prev.filter(p => p !== photoUrl)]);
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to set primary photo.');
+                            }
+                        },
+                    },
+                ]
+            );
+        }
+    };
+
     const renderPhoto = ({ item: photoUrl }: { item: string }) => (
-        <Image
-            source={{ uri: photoUrl }}
-            style={styles.avatar}
-            resizeMode="cover"
-        />
+        <Pressable
+            onLongPress={() => handleSetPrimaryPhoto(photoUrl)}
+            delayLongPress={400}
+        >
+            <Image
+                source={{ uri: photoUrl }}
+                style={styles.avatar}
+                resizeMode="cover"
+            />
+        </Pressable>
     );
 
     return (
@@ -200,20 +247,6 @@ export function MapCatCard({
                         </Text>
                     </View>
                 </View>
-
-                {/* Location - Only if description exists, remove lock/privacy text */}
-                {item.locationDescription ? (
-                    <View style={styles.locationRow}>
-                        <SymbolView
-                            name="mappin.and.ellipse"
-                            tintColor={secondaryTextColor}
-                            size={16}
-                        />
-                        <Text style={[styles.locationLabel, { color: secondaryTextColor }]}>
-                            {item.locationDescription}
-                        </Text>
-                    </View>
-                ) : null}
 
                 {/* Stats */}
                 <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>

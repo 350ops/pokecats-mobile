@@ -1,4 +1,5 @@
 import { MapCatCard } from '@/components/MapCatCard';
+import { MarkerView } from '@/components/MarkerView';
 import { GlassView } from '@/components/ui/GlassView';
 import { NativeGlassIconButton } from '@/components/ui/NativeGlassIconButton';
 import { getColorLabel, getPatternLabel } from '@/constants/CatAppearance';
@@ -7,12 +8,13 @@ import { useTheme } from '@/context/ThemeContext';
 import { getCatStatusState } from '@/lib/cat_logic';
 import { addFeeding, addSighting, getCats, updateCat } from '@/lib/database';
 import { updateWidgetData } from '@/lib/widget';
+import * as ExpoLocation from 'expo-location';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import type { ComponentProps } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, FlatList, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, FlatList, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Circle, Marker, Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type MapCat = {
@@ -70,6 +72,9 @@ export default function MapScreen() {
     const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
     const [feedingCatId, setFeedingCatId] = useState<number | null>(null);
     const [statusUpdatingCatId, setStatusUpdatingCatId] = useState<number | null>(null);
+    const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('satellite');
+    const [mapModesModalVisible, setMapModesModalVisible] = useState(false);
+    const [initialRegion, setInitialRegion] = useState<Region>(INITIAL_REGION);
     const mapRef = useRef<MapView | null>(null);
     const carouselRef = useRef<FlatList<MapCat>>(null);
     const jitterCacheRef = useRef<Map<number, { latitude: number; longitude: number }>>(new Map());
@@ -78,6 +83,42 @@ export default function MapScreen() {
     const secondaryTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
     const cardSurface = isDark ? 'rgba(32, 32, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)';
     const statSurface = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+
+    // Center map on user's location when app opens
+    useEffect(() => {
+        const centerOnUserLocation = async () => {
+            try {
+                const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+                if (status !== 'granted') return;
+
+                const location = await ExpoLocation.getCurrentPositionAsync({});
+                const userRegion: Region = {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                };
+                setInitialRegion(userRegion);
+
+                // Also animate to user location with 3D tilt
+                mapRef.current?.animateCamera({
+                    center: {
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude,
+                    },
+                    pitch: 55,
+                    heading: 0,
+                    altitude: 800,
+                    zoom: 17,
+                }, { duration: 1000 });
+            } catch (error) {
+                console.log('Could not get user location, using default region');
+            }
+        };
+
+        centerOnUserLocation();
+    }, []);
+
 
     useFocusEffect(
         useCallback(() => {
@@ -148,18 +189,23 @@ export default function MapScreen() {
             const { coordinate } = getDisplayCoordinate(cat);
             // If we don't have a real coordinate, don't try to "focus" the map.
             if (!coordinate?.latitude || !coordinate?.longitude) return;
+
             const latitudeDelta = 0.01;
-            const longitudeDelta = 0.01;
             const latitudeOffset = latitudeDelta * MAP_FOCUS_VERTICAL_OFFSET_FRACTION;
-            mapRef.current.animateToRegion(
+
+            // Use animateCamera to maintain 3D pitch
+            mapRef.current.animateCamera(
                 {
-                    // Center slightly south of the marker so the marker is visible above the bottom card.
-                    latitude: coordinate.latitude - latitudeOffset,
-                    longitude: coordinate.longitude,
-                    latitudeDelta,
-                    longitudeDelta,
+                    center: {
+                        latitude: coordinate.latitude - latitudeOffset,
+                        longitude: coordinate.longitude,
+                    },
+                    pitch: 45,
+                    heading: 0,
+                    altitude: 1000, // Approximate zoom for delta 0.01
+                    zoom: 15,
                 },
-                260
+                { duration: 1000 }
             );
         },
         [getDisplayCoordinate]
@@ -170,6 +216,11 @@ export default function MapScreen() {
             focusMapOnCat(selectedCat);
         }
     }, [selectedCat, focusMapOnCat]);
+
+    useEffect(() => {
+        // Initial 3D tilt
+        mapRef.current?.animateCamera({ pitch: 45, heading: 0 }, { duration: 1000 });
+    }, []);
 
     if (Platform.OS === 'web') {
         return (
@@ -280,6 +331,30 @@ export default function MapScreen() {
         }
     };
 
+    const centerOnUserLocation = async () => {
+        try {
+            const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Location permission is required to center on your location.');
+                return;
+            }
+            const location = await ExpoLocation.getCurrentPositionAsync({});
+            mapRef.current?.animateCamera({
+                center: {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                },
+                pitch: 45,
+                heading: 0,
+                altitude: 1000,
+                zoom: 15,
+            }, { duration: 1000 });
+        } catch (error) {
+            console.error(error);
+            Alert.alert('Error', 'Unable to get your location.');
+        }
+    };
+
     const catCountLabel = `${cats.length} cats nearby`;
 
     const renderCarouselItem = ({ item, index }: { item: MapCat; index: number }) => {
@@ -330,10 +405,14 @@ export default function MapScreen() {
             <MapView
                 ref={mapRef}
                 style={StyleSheet.absoluteFill}
-                initialRegion={INITIAL_REGION}
+                initialRegion={initialRegion}
                 showsPointsOfInterest={false}
                 userInterfaceStyle={colorScheme ?? 'light'}
                 tintColor={Colors.primary.green}
+                mapType={mapType === 'satellite' ? (Platform.OS === 'android' ? 'satellite' : 'satelliteFlyover') : mapType}
+                pitchEnabled={true}
+                showsBuildings={true}
+                showsUserLocation={true}
             >
                 {filteredCats.map((cat) => {
                     const { coordinate } = getDisplayCoordinate(cat);
@@ -342,37 +421,39 @@ export default function MapScreen() {
                     const statusState = getCatStatusState(cat as any);
 
                     return (
-                        <Marker
-                            key={String(cat.id)}
-                            coordinate={coordinate}
-                            onPress={(event) => {
-                                event.stopPropagation();
-                                handleMarkerPress(cat);
-                            }}
-                            testID={`marker-${cat.id}`}
-                            style={{ zIndex: isSelected ? 999 : 1 }}
-                        >
-                            {/* 3D Puck Design:
-                                - 70% Opacity Background (Hex + B3)
-                                - Strong Shadow for depth
-                                - No border (or thin border)
-                             */}
-                            <View style={[
-                                styles.markerPuck,
-                                isSelected && styles.markerPuckActive,
-                                {
-                                    backgroundColor: `${statusState.markerColor}B3`, // 70% Opacity
-                                    shadowColor: statusState.markerColor, // Colored shadow for glow/depth
-                                }
-                            ]}>
-                                <View style={styles.markerImageContainer}>
-                                    <Image
-                                        source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CAT_FALLBACK}
-                                        style={styles.markerImage}
-                                    />
-                                </View>
-                            </View>
-                        </Marker>
+                        <React.Fragment key={String(cat.id)}>
+                            {/* 75m radius circle around selected marker only */}
+                            {isSelected && (
+                                <Circle
+                                    center={coordinate}
+                                    radius={75}
+                                    fillColor="rgba(128, 128, 128, 0.2)"
+                                    strokeColor="rgba(255, 255, 255, 0.8)"
+                                    strokeWidth={2}
+                                />
+                            )}
+                            <Marker
+                                coordinate={coordinate}
+                                onPress={(event) => {
+                                    event.stopPropagation();
+                                    handleMarkerPress(cat);
+                                }}
+                                testID={`marker-${cat.id}`}
+                                style={{ zIndex: isSelected ? 999 : 1 }}
+                            // Anchor at bottom center (where the pin tip is)
+                            // Default is (0.5, 0.5). For a pin, we want (0.5, 1.0) usually?
+                            // My MarkerView has `marginBottom: SIZE/2` to shift it up visually.
+                            // So (0.5, 0.5) might work if the visual center is the middle of the bounding box?
+                            // Let's rely on standard centering and the generic styling first.
+                            // Actually, standard pins need `anchor={{ x: 0.5, y: 1 }}` but I'll check my styling.
+                            >
+                                <MarkerView
+                                    color={statusState.markerColor}
+                                    selected={isSelected}
+                                    glyph={cat.tnrStatus ? 'checkmark.shield.fill' : 'pawprint.fill'}
+                                />
+                            </Marker>
+                        </React.Fragment>
                     );
                 })}
             </MapView>
@@ -412,6 +493,101 @@ export default function MapScreen() {
                     accessibilityLabel="Add cat"
                 />
             </View>
+
+            {/* Map Controls Pill - Right Side */}
+            <View style={[styles.mapControlsPill, { top: insets.top + 72 }]}>
+                <GlassView
+                    style={styles.mapControlsPillInner}
+                    intensity={70}
+                    tintColor="rgba(0,0,0,0)"
+                >
+                    <Pressable
+                        style={styles.mapControlButton}
+                        onPress={() => setMapModesModalVisible(true)}
+                        accessibilityLabel="Map modes"
+                    >
+                        <SymbolView name="map.fill" size={20} tintColor={primaryTextColor} />
+                    </Pressable>
+                    <View style={styles.mapControlDivider} />
+                    <Pressable
+                        style={styles.mapControlButton}
+                        onPress={centerOnUserLocation}
+                        accessibilityLabel="Center on my location"
+                    >
+                        <SymbolView name="location.fill" size={20} tintColor={Colors.primary.blue} />
+                    </Pressable>
+                </GlassView>
+            </View>
+
+            {/* Map Modes Modal */}
+            <Modal
+                visible={mapModesModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setMapModesModalVisible(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setMapModesModalVisible(false)}
+                >
+                    <View style={styles.mapModesModal}>
+                        <View style={styles.mapModesHeader}>
+                            <Text style={styles.mapModesTitle}>Map Modes</Text>
+                            <Pressable onPress={() => setMapModesModalVisible(false)}>
+                                <SymbolView name="xmark" size={20} tintColor="#666" />
+                            </Pressable>
+                        </View>
+                        <View style={styles.mapModesGrid}>
+                            <Pressable
+                                style={[
+                                    styles.mapModeOption,
+                                    mapType === 'standard' && styles.mapModeOptionSelected
+                                ]}
+                                onPress={() => {
+                                    setMapType('standard');
+                                    setMapModesModalVisible(false);
+                                }}
+                            >
+                                <View style={styles.mapModePreview}>
+                                    <SymbolView name="map" size={32} tintColor="#666" />
+                                </View>
+                                <Text style={styles.mapModeLabel}>Explore</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.mapModeOption,
+                                    mapType === 'hybrid' && styles.mapModeOptionSelected
+                                ]}
+                                onPress={() => {
+                                    setMapType('hybrid');
+                                    setMapModesModalVisible(false);
+                                }}
+                            >
+                                <View style={styles.mapModePreview}>
+                                    <SymbolView name="car.fill" size={32} tintColor="#666" />
+                                </View>
+                                <Text style={styles.mapModeLabel}>Hybrid</Text>
+                            </Pressable>
+                            <Pressable
+                                style={[
+                                    styles.mapModeOption,
+                                    mapType === 'satellite' && styles.mapModeOptionSelected
+                                ]}
+                                onPress={() => {
+                                    setMapType('satellite');
+                                    setMapModesModalVisible(false);
+                                }}
+                            >
+                                <View style={styles.mapModePreview}>
+                                    <SymbolView name="globe.americas.fill" size={32} tintColor="#666" />
+                                </View>
+                                <Text style={styles.mapModeLabel}>Satellite</Text>
+                            </Pressable>
+                        </View>
+                        <Text style={styles.mapModesAttribution}>© OpenStreetMap and other data providers</Text>
+                    </View>
+                </Pressable>
+            </Modal>
 
             {!filteredCats.length && (
                 <View style={styles.emptyState}>
@@ -758,36 +934,95 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
     },
-    markerPuck: {
-        width: 55,
-        height: 55,
-        borderRadius: 27.5,
-        alignItems: 'center',
-        justifyContent: 'center',
-        // 3D Effect
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 6,
-        // Optional: Add a subtle border to define edges against map
-        borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.2)',
-    },
-    markerPuckActive: {
-        transform: [{ scale: 1.25 }],
-        zIndex: 999,
-        borderWidth: 2,
-        borderColor: '#fff',
-    },
-    markerImageContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#fff', // fallback
-        overflow: 'hidden',
-    },
     markerImage: {
         width: '100%',
         height: '100%',
+    },
+    // Map Controls Pill styles
+    mapControlsPill: {
+        position: 'absolute',
+        right: 20,
+        borderRadius: 24,
+        overflow: 'hidden',
+    },
+    mapControlsPillInner: {
+        flexDirection: 'column',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 24,
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+    },
+    mapControlButton: {
+        padding: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mapControlDivider: {
+        width: 24,
+        height: 1,
+        backgroundColor: 'rgba(128, 128, 128, 0.3)',
+    },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    mapModesModal: {
+        backgroundColor: '#F2F2F7',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingTop: 16,
+        paddingBottom: 40,
+        paddingHorizontal: 20,
+    },
+    mapModesHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    mapModesTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#000',
+        flex: 1,
+        textAlign: 'center',
+    },
+    mapModesGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 16,
+    },
+    mapModeOption: {
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    mapModeOptionSelected: {
+        borderColor: Colors.primary.blue,
+    },
+    mapModePreview: {
+        width: 70,
+        height: 70,
+        borderRadius: 12,
+        backgroundColor: '#E5E5EA',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 6,
+    },
+    mapModeLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#000',
+    },
+    mapModesAttribution: {
+        fontSize: 11,
+        color: '#8E8E93',
+        textAlign: 'center',
     },
 });

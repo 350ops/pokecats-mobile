@@ -503,3 +503,219 @@ export const submitQuickReport = async (payload: QuickReportPayload) => {
     );
     return null;
 };
+
+// ============================================
+// Community Posts Functions
+// ============================================
+
+export type CommunityPostInput = {
+    content: string;
+    category: string;
+    imageUri?: string;
+    catTags?: string[];
+};
+
+export type CommunityPostDB = {
+    id: number;
+    user_id: string | null;
+    user_name: string;
+    avatar_url: string | null;
+    content: string;
+    image_url: string | null;
+    category: string;
+    cat_tags: string[];
+    likes_count: number;
+    comments_count: number;
+    created_at: string;
+};
+
+export const getCommunityPosts = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+        .from('community_posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching community posts:', error);
+        return [];
+    }
+
+    // Check which posts the current user has liked
+    let likedPostIds: number[] = [];
+    if (user) {
+        const { data: likes } = await supabase
+            .from('community_likes')
+            .select('post_id')
+            .eq('user_id', user.id);
+        likedPostIds = likes?.map(l => l.post_id) ?? [];
+    }
+
+    return data.map((post: CommunityPostDB) => ({
+        id: String(post.id),
+        user: post.user_name,
+        avatar: post.avatar_url || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+        content: post.content,
+        time: getRelativeTime(post.created_at),
+        likes: post.likes_count,
+        comments: post.comments_count,
+        likedByMe: likedPostIds.includes(post.id),
+        image: post.image_url || undefined,
+        category: post.category,
+        cats: post.cat_tags?.map((name, idx) => ({ id: `${post.id}_cat_${idx}`, name })) || [],
+    }));
+};
+
+export const createCommunityPost = async (input: CommunityPostInput) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Upload image if provided
+    let imageUrl: string | null = null;
+    if (input.imageUri) {
+        imageUrl = await uploadCatImage(input.imageUri);
+    }
+
+    const { data, error } = await supabase
+        .from('community_posts')
+        .insert({
+            user_id: user?.id,
+            user_name: 'You', // TODO: Get from user profile
+            avatar_url: null,
+            content: input.content,
+            image_url: imageUrl,
+            category: input.category,
+            cat_tags: input.catTags || [],
+        })
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error creating community post:', error);
+        throw error;
+    }
+
+    return data;
+};
+
+export const togglePostLike = async (postId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Must be logged in to like posts');
+
+    const numericId = parseInt(postId.replace('p_', ''));
+
+    // Check if already liked
+    const { data: existing } = await supabase
+        .from('community_likes')
+        .select('id')
+        .eq('post_id', numericId)
+        .eq('user_id', user.id)
+        .single();
+
+    if (existing) {
+        // Unlike - delete like and decrement count
+        await supabase.from('community_likes').delete().eq('id', existing.id);
+
+        const { data: post } = await supabase
+            .from('community_posts')
+            .select('likes_count')
+            .eq('id', numericId)
+            .single();
+
+        if (post) {
+            await supabase.from('community_posts')
+                .update({ likes_count: Math.max(0, (post.likes_count || 0) - 1) })
+                .eq('id', numericId);
+        }
+
+        return false;
+    } else {
+        // Like
+        await supabase.from('community_likes').insert({ post_id: numericId, user_id: user.id });
+
+        // Increment likes_count
+        const { data: post } = await supabase
+            .from('community_posts')
+            .select('likes_count')
+            .eq('id', numericId)
+            .single();
+
+        if (post) {
+            await supabase.from('community_posts')
+                .update({ likes_count: (post.likes_count || 0) + 1 })
+                .eq('id', numericId);
+        }
+
+        return true;
+    }
+};
+
+export const getPostComments = async (postId: string) => {
+    const numericId = parseInt(postId.replace('p_', ''));
+
+    const { data, error } = await supabase
+        .from('community_comments')
+        .select('*')
+        .eq('post_id', numericId)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching comments:', error);
+        return [];
+    }
+
+    return data.map((c: any) => ({
+        id: String(c.id),
+        user: c.user_name,
+        content: c.content,
+        time: getRelativeTime(c.created_at),
+    }));
+};
+
+export const addPostComment = async (postId: string, content: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const numericId = parseInt(postId.replace('p_', ''));
+
+    const { error } = await supabase
+        .from('community_comments')
+        .insert({
+            post_id: numericId,
+            user_id: user?.id,
+            user_name: 'You',
+            content,
+        });
+
+    if (error) {
+        console.error('Error adding comment:', error);
+        throw error;
+    }
+
+    // Increment comments_count
+    const { data: post } = await supabase
+        .from('community_posts')
+        .select('comments_count')
+        .eq('id', numericId)
+        .single();
+
+    if (post) {
+        await supabase.from('community_posts')
+            .update({ comments_count: (post.comments_count || 0) + 1 })
+            .eq('id', numericId);
+    }
+};
+
+// Helper to convert timestamp to relative time
+const getRelativeTime = (timestamp: string) => {
+    const now = new Date();
+    const date = new Date(timestamp);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+};

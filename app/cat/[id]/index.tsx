@@ -554,7 +554,7 @@ const getActiveAlerts = (cat: any): { key: string; label: string; icon: string; 
             if (hoursAgo > 48) {
                 alerts.push({
                     key: 'not-seen-48h',
-                    label: 'Not seen in 48h+',
+                    label: 'Not seen in the last 2 days',
                     icon: 'eye.slash.fill',
                     color: '#F59E0B',
                 });

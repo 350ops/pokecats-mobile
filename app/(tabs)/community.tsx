@@ -2,9 +2,9 @@ import { GlassButton } from '@/components/ui/GlassButton';
 import { GlassView } from '@/components/ui/GlassView';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
-import { getCats } from '@/lib/database';
+import { addPostComment, createCommunityPost, getCats, getCommunityPosts, togglePostLike } from '@/lib/database';
 import * as ImagePicker from 'expo-image-picker';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Image, ImageBackground, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -81,6 +81,25 @@ export default function CommunityScreen() {
                 return posts;
         }
     }, [posts, activeFilter]);
+
+    // Load posts from Supabase on screen focus
+    useFocusEffect(
+        useCallback(() => {
+            let isMounted = true;
+            const loadPosts = async () => {
+                try {
+                    const data = await getCommunityPosts();
+                    if (isMounted) {
+                        setPosts(data as CommunityPost[]);
+                    }
+                } catch (e) {
+                    console.error('Failed to load community posts:', e);
+                }
+            };
+            loadPosts();
+            return () => { isMounted = false; };
+        }, [])
+    );
 
     const getCategoryStyle = (category: PostCategory, forModal = false) => {
         // Pastel colors for modal, stronger colors for posts
@@ -188,49 +207,58 @@ export default function CommunityScreen() {
         setCatSuggestions([]);
     };
 
-    const submitNewPost = () => {
+    const submitNewPost = async () => {
         const content = newPostContent.trim();
         if (!content || !newPostCategory) return;
 
-        const nowId = `p_${Date.now()}`;
-        const cats = newPostCats.map((name, idx) => ({
-            id: `${nowId}_cat_${idx}`,
-            name,
-            isMine: true,
-        }));
+        try {
+            // Create post in Supabase
+            const dbPost = await createCommunityPost({
+                content,
+                category: newPostCategory,
+                imageUri: newPostPhoto?.uri,
+                catTags: newPostCats,
+            });
 
-        const next: CommunityPost = {
-            id: nowId,
-            user: 'You',
-            // Keep consistent with existing mock data (remote avatar). We can wire this to Supabase user metadata later.
-            avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-            content,
-            time: 'now',
-            likes: 0,
-            comments: 0,
-            likedByMe: false,
-            commentThread: [],
-            image: newPostPhoto?.uri || undefined,
-            category: newPostCategory,
-            cats: cats.length ? cats : undefined,
-        };
+            // Add to local state for immediate UI update
+            const newPost: CommunityPost = {
+                id: String(dbPost.id),
+                user: 'You',
+                avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+                content,
+                time: 'now',
+                likes: 0,
+                comments: 0,
+                likedByMe: false,
+                commentThread: [],
+                image: dbPost.image_url || undefined,
+                category: newPostCategory,
+                cats: newPostCats.map((name, idx) => ({ id: `${dbPost.id}_cat_${idx}`, name, isMine: true })),
+            };
 
-        setPosts((prev) => [next, ...prev]);
-        setNewPostOpen(false);
+            setPosts((prev) => [newPost, ...prev]);
+            setNewPostOpen(false);
+        } catch (error) {
+            console.error('Failed to create post:', error);
+        }
     };
 
-    const toggleLike = (id: string) => {
-        setPosts((prev) =>
-            prev.map((post) => {
-                if (post.id !== id) return post;
-                const liked = !post.likedByMe;
-                return {
-                    ...post,
-                    likedByMe: liked,
-                    likes: Math.max(0, (post.likes ?? 0) + (liked ? 1 : -1)),
-                };
-            })
-        );
+    const toggleLike = async (id: string) => {
+        try {
+            const liked = await togglePostLike(id);
+            setPosts((prev) =>
+                prev.map((post) => {
+                    if (post.id !== id) return post;
+                    return {
+                        ...post,
+                        likedByMe: liked,
+                        likes: Math.max(0, (post.likes ?? 0) + (liked ? 1 : -1)),
+                    };
+                })
+            );
+        } catch (error) {
+            console.error('Failed to toggle like:', error);
+        }
     };
 
     const openComments = (id: string) => {
@@ -248,27 +276,35 @@ export default function CommunityScreen() {
         [commentingPostId, posts]
     );
 
-    const addComment = () => {
+    const addComment = async () => {
         const text = commentDraft.trim();
         if (!commentingPostId || !text) return;
-        setPosts((prev) =>
-            prev.map((post) => {
-                if (post.id !== commentingPostId) return post;
-                const nextThread = post.commentThread ? [...post.commentThread] : [];
-                nextThread.push({
-                    id: `c_${Date.now()}`,
-                    user: 'You',
-                    content: text,
-                    time: 'now',
-                });
-                return {
-                    ...post,
-                    commentThread: nextThread,
-                    comments: (post.comments ?? 0) + 1,
-                };
-            })
-        );
-        setCommentDraft('');
+
+        try {
+            await addPostComment(commentingPostId, text);
+
+            // Update local state
+            setPosts((prev) =>
+                prev.map((post) => {
+                    if (post.id !== commentingPostId) return post;
+                    const nextThread = post.commentThread ? [...post.commentThread] : [];
+                    nextThread.push({
+                        id: `c_${Date.now()}`,
+                        user: 'You',
+                        content: text,
+                        time: 'now',
+                    });
+                    return {
+                        ...post,
+                        commentThread: nextThread,
+                        comments: (post.comments ?? 0) + 1,
+                    };
+                })
+            );
+            setCommentDraft('');
+        } catch (error) {
+            console.error('Failed to add comment:', error);
+        }
     };
 
     const renderItem = ({ item }: { item: CommunityPost }) => {
@@ -361,27 +397,27 @@ export default function CommunityScreen() {
                         {FILTERS.map((filter) => {
                             const active = filter.id === activeFilter;
                             return (
-                            <Pressable
-                                key={filter.id}
-                                onPress={() => setActiveFilter(filter.id)}
-                                style={[
-                                    styles.filterChip,
-                                    isDark && !active && styles.filterChipDark,
-                                    active && styles.filterChipActive,
-                                ]}
-                            >
-                                <Text
+                                <Pressable
+                                    key={filter.id}
+                                    onPress={() => setActiveFilter(filter.id)}
                                     style={[
-                                        styles.filterChipText,
-                                        isDark && !active && styles.filterChipTextDark,
-                                        active && styles.filterChipTextActive,
+                                        styles.filterChip,
+                                        isDark && !active && styles.filterChipDark,
+                                        active && styles.filterChipActive,
                                     ]}
                                 >
-                                    {filter.label}
-                                </Text>
-                            </Pressable>
-                        );
-                    })}
+                                    <Text
+                                        style={[
+                                            styles.filterChipText,
+                                            isDark && !active && styles.filterChipTextDark,
+                                            active && styles.filterChipTextActive,
+                                        ]}
+                                    >
+                                        {filter.label}
+                                    </Text>
+                                </Pressable>
+                            );
+                        })}
                     </View>
                     <View style={[styles.filterSeparator, { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }]} />
                     <Pressable
@@ -412,8 +448,8 @@ export default function CommunityScreen() {
                         showsVerticalScrollIndicator={false}
                     >
                         <Text style={[styles.newPostLabel, { color: isDark ? Colors.glass.textSecondary : Colors.light.icon }]}>
-                             Badge (choose one)
-                            
+                            Badge (choose one)
+
                         </Text>
                         <View style={styles.newPostCategoryRow}>
                             {POST_CATEGORIES.map((cat) => {
@@ -425,8 +461,8 @@ export default function CommunityScreen() {
                                         onPress={() => setNewPostCategory((prev) => (prev === cat ? null : cat))}
                                         style={({ pressed }) => [
                                             styles.newPostBadgeChip,
-                                            { 
-                                                backgroundColor: s.bg, 
+                                            {
+                                                backgroundColor: s.bg,
                                                 borderColor: selected ? s.text : s.border,
                                                 borderWidth: selected ? 2 : 1,
                                             },
@@ -533,7 +569,7 @@ export default function CommunityScreen() {
                                 onPress={pickPostPhoto}
                                 style={[
                                     styles.newPostPhotoPickerBox,
-                                    { 
+                                    {
                                         borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
                                         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
                                     }
