@@ -5,7 +5,7 @@ import { getColorLabel, getPatternLabel } from '@/constants/CatAppearance';
 import { Colors } from '@/constants/Colors';
 import { useTheme } from '@/context/ThemeContext';
 import { getCatStatusState } from '@/lib/cat_logic';
-import { addFeeding, getCats, updateCat } from '@/lib/database';
+import { addFeeding, addSighting, getCats, updateCat } from '@/lib/database';
 import { updateWidgetData } from '@/lib/widget';
 import { router, useFocusEffect } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -76,7 +76,7 @@ export default function MapScreen() {
     const scrollX = useRef(new Animated.Value(0)).current;
     const primaryTextColor = isDark ? Colors.glass.text : Colors.primary.dark;
     const secondaryTextColor = isDark ? Colors.glass.textSecondary : 'rgba(0,0,0,0.65)';
-    const cardSurface = isDark ? Colors.glass.background : 'rgba(255,255,255,0.25)';
+    const cardSurface = isDark ? 'rgba(32, 32, 30, 0.85)' : 'rgba(255, 255, 255, 0.85)';
     const statSurface = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
 
     useFocusEffect(
@@ -185,7 +185,8 @@ export default function MapScreen() {
             const timestamp = new Date().toISOString();
             await Promise.all([
                 addFeeding(cat.id, 'Quick Feed', 'Snack', false),
-                updateCat(cat.id, { lastFed: timestamp }),
+                addSighting(cat.id), // Also mark as seen
+                updateCat(cat.id, { lastFed: timestamp, lastSighted: timestamp }),
             ]);
             setCats((prev) =>
                 prev.map((item) =>
@@ -193,6 +194,7 @@ export default function MapScreen() {
                         ? {
                             ...item,
                             lastFed: new Date(timestamp),
+                            lastSighted: new Date(timestamp), // Update local state for "Seen"
                             timesFed: (item.timesFed ?? 0) + 1,
                         }
                         : item
@@ -308,7 +310,6 @@ export default function MapScreen() {
             >
                 <MapCatCard
                     item={item}
-                    precise={precise}
                     statusState={statusState}
                     onNavigate={() => handleNavigate(item)}
                     onFeed={() => handleFeedCat(item)}
@@ -349,17 +350,27 @@ export default function MapScreen() {
                                 handleMarkerPress(cat);
                             }}
                             testID={`marker-${cat.id}`}
+                            style={{ zIndex: isSelected ? 999 : 1 }}
                         >
-                            {/* Simplified Marker View for performance, prioritizing the Ring color */}
+                            {/* 3D Puck Design:
+                                - 70% Opacity Background (Hex + B3)
+                                - Strong Shadow for depth
+                                - No border (or thin border)
+                             */}
                             <View style={[
-                                styles.markerRing,
-                                isSelected && styles.markerRingActive,
-                                { borderColor: statusState.markerColor }
+                                styles.markerPuck,
+                                isSelected && styles.markerPuckActive,
+                                {
+                                    backgroundColor: `${statusState.markerColor}B3`, // 70% Opacity
+                                    shadowColor: statusState.markerColor, // Colored shadow for glow/depth
+                                }
                             ]}>
-                                <Image
-                                    source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CAT_FALLBACK}
-                                    style={styles.markerImage}
-                                />
+                                <View style={styles.markerImageContainer}>
+                                    <Image
+                                        source={cat.image && cat.image.startsWith('http') ? { uri: cat.image } : CAT_FALLBACK}
+                                        style={styles.markerImage}
+                                    />
+                                </View>
                             </View>
                         </Marker>
                     );
@@ -370,7 +381,17 @@ export default function MapScreen() {
                 style={[styles.catCountPill, { top: insets.top + 12 }]}
                 onPress={() => router.push({ pathname: '/discover', params: { sort: 'distance' } })}
             >
-                <GlassView style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24 }} intensity={70}>
+                <GlassView
+                    style={{
+                        paddingHorizontal: 20,
+                        paddingVertical: 12,
+                        borderRadius: 24,
+                        backgroundColor: 'transparent',
+                        borderWidth: 0
+                    }}
+                    intensity={70}
+                    tintColor="rgba(0,0,0,0)" // Transparent tint to match NativeGlassIconButton
+                >
                     <Text style={[styles.catCountText, { color: primaryTextColor }]}>{catCountLabel}</Text>
                 </GlassView>
             </Pressable>
@@ -737,26 +758,36 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
     },
-    markerRing: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        borderWidth: 3,
+    markerPuck: {
+        width: 55,
+        height: 55,
+        borderRadius: 27.5,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: 'black',
-        shadowOffset: { width: 0, height: 2 },
+        // 3D Effect
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 3,
-        elevation: 4,
+        shadowRadius: 4,
+        elevation: 6,
+        // Optional: Add a subtle border to define edges against map
+        borderWidth: 1.5,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
-    markerRingActive: {
+    markerPuckActive: {
         transform: [{ scale: 1.25 }],
         zIndex: 999,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    markerImageContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#fff', // fallback
+        overflow: 'hidden',
     },
     markerImage: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: '100%',
+        height: '100%',
     },
 });

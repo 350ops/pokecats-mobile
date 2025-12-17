@@ -49,7 +49,6 @@ type SymbolName = React.ComponentProps<typeof SymbolView>['name'];
 
 interface MapCatCardProps {
     item: MapCat;
-    precise: boolean;
     statusState: {
         statusColor: string;
         labelColor: string;
@@ -69,7 +68,6 @@ interface MapCatCardProps {
 
 export function MapCatCard({
     item,
-    precise,
     statusState,
     onNavigate,
     onFeed,
@@ -203,17 +201,19 @@ export function MapCatCard({
                     </View>
                 </View>
 
-                {/* Location */}
-                <View style={styles.locationRow}>
-                    <SymbolView
-                        name={precise ? 'lock.open.fill' : 'lock.fill'}
-                        tintColor={precise ? Colors.primary.green : Colors.primary.yellow}
-                        size={18}
-                    />
-                    <Text style={[styles.locationLabel, { color: secondaryTextColor }]}>
-                        {catLocationCopy(item, precise)}
-                    </Text>
-                </View>
+                {/* Location - Only if description exists, remove lock/privacy text */}
+                {item.locationDescription ? (
+                    <View style={styles.locationRow}>
+                        <SymbolView
+                            name="mappin.and.ellipse"
+                            tintColor={secondaryTextColor}
+                            size={16}
+                        />
+                        <Text style={[styles.locationLabel, { color: secondaryTextColor }]}>
+                            {item.locationDescription}
+                        </Text>
+                    </View>
+                ) : null}
 
                 {/* Stats */}
                 <View style={[styles.statsBlock, { backgroundColor: statSurface }]}>
@@ -229,14 +229,14 @@ export function MapCatCard({
                         icon="eye.fill"
                         label="Seen"
                         value={getTimeAgo(lastSighted)}
-                        tint="#cc00ffff"
+                        tint="#32D74B"
                         valueColor={primaryTextColor}
                         dynamicLabelColor={primaryTextColor}
                     />
                     <StatRow
                         icon={item.tnrStatus ? 'checkmark.shield.fill' : 'exclamationmark.shield.fill'}
                         label="TNR"
-                        value={item.tnrStatus ? 'Sterilized' : 'Intact'}
+                        value={item.tnrStatus ? 'Neutered' : 'Not Neutered'}
                         tint={Colors.primary.blue}
                         valueColor={primaryTextColor}
                         dynamicLabelColor={primaryTextColor}
@@ -250,7 +250,7 @@ export function MapCatCard({
                         label="Seen"
                         onPress={handleSeen}
                         textColor={primaryTextColor}
-                        iconColor={Colors.primary.blue}
+                        iconColor="#32D74B"
                         backgroundColor={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'}
                     />
                     <MapActionButton
@@ -302,7 +302,7 @@ export function MapCatCard({
     );
 }
 
-// Helpers duplicated/shared
+// Helpers
 const getTimeAgo = (dateValue?: string | Date | null) => {
     if (!dateValue) return 'Unknown';
     const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
@@ -314,11 +314,6 @@ const getTimeAgo = (dateValue?: string | Date | null) => {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
     return `${days}d ago`;
-};
-
-const catLocationCopy = (item: MapCat, precise: boolean) => {
-    if (item.locationDescription) return item.locationDescription;
-    return precise ? 'Exact location shared' : 'Approximate location for privacy';
 };
 
 

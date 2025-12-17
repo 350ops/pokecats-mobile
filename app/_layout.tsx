@@ -115,8 +115,7 @@ function RootLayoutContent() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'New Sighting', headerShown: true }} />
         <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Add Cat', headerShown: true }} />
-        <Stack.Screen name="clips/index" options={{ title: 'Cat Clips', headerShown: true }} />
-        <Stack.Screen name="clips/record" options={{ title: 'Record Clip', headerShown: true }} />
+        <Stack.Screen name="clips/record" options={{ title: 'Record Clip', headerShown: false }} />
         <Stack.Screen name="cat/[id]/index" options={{ title: 'Cat Profile', headerBackTitle: 'Back', headerShown: true }} />
         <Stack.Screen name="cat/[id]/edit" options={{ title: 'Edit Cat', presentation: 'modal', headerShown: true }} />
         <Stack.Screen name="update" options={{ title: 'Update Cat', headerBackTitle: 'Back', headerShown: true }} />

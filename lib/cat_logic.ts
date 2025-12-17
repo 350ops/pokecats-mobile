@@ -23,21 +23,20 @@ export const getCatStatusState = (cat: StatusCat): CatStatusState => {
     // OR if status is explicitly "Hungry" (though we calculate this dynamically usually)
     if (statusLower === 'needs help' || hoursSinceFed > 18) {
         return {
-            statusText: statusLower === 'needs help' ? 'Needs Help' : 'Hungry', // Keep 'Needs Help' if explicit, else 'Hungry' for time-based
-            statusColor: '#ff4d4d', // Red
-            markerColor: 'red',
+            statusText: statusLower === 'needs help' ? 'Needs Help' : 'Hungry',
+            statusColor: '#FF453A', // User Red
+            markerColor: '#FF453A',
             labelColor: '#ffffff'
         };
     }
 
     // Priority 2: "Healthy" (or undefined or explicitly "Hungry") AND "Last Fed > 8h" -> Amber/Hungry
-    // If it was marked "Hungry" but is now fed, it should become Healthy (Green) if < 8h
     if (statusLower === 'healthy' || statusLower === 'hungry' || !cat.status) {
         if (hoursSinceFed > 8) {
             return {
                 statusText: 'Hungry',
-                statusColor: '#FFA500', // Amber/Orange
-                markerColor: 'orange',
+                statusColor: '#FF9F0A', // User Orange
+                markerColor: '#FF9F0A',
                 labelColor: '#ffffff'
             };
         }
@@ -45,17 +44,17 @@ export const getCatStatusState = (cat: StatusCat): CatStatusState => {
         // Priority 3: "Healthy" AND "Last Fed <= 8h" -> Green/Healthy
         return {
             statusText: 'Healthy',
-            statusColor: 'rgb(47, 202, 0)', // Green
-            markerColor: 'green',
+            statusColor: '#12C82D', // User Green
+            markerColor: '#12C82D',
             labelColor: '#ffffff'
         };
     }
 
-    // Fallback for Adopted or other statuses
+    // Fallback
     return {
         statusText: cat.status || 'Unknown',
         statusColor: '#999999',
-        markerColor: 'grey',
+        markerColor: '#999999',
         labelColor: '#ffffff'
     };
 };

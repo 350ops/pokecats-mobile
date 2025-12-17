@@ -48,11 +48,7 @@ function ClipCard({
                         contentFit="cover"
                     />
                 </View>
-            ) : (
-                <View style={[styles.video, styles.videoFallback]}>
-                    <Text style={{ color: subTextColor }}>Unable to load clip</Text>
-                </View>
-            )}
+            ) : null}
             <View style={styles.cardContent}>
                 <View style={styles.row}>
                     <Text style={[styles.title, { color: textColor }]}>Clip</Text>
